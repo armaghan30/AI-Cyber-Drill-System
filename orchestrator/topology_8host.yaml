@@ -1,0 +1,114 @@
+network:
+  hosts:
+    # DMZ tier (internet-facing)
+    H1:
+      os: linux
+      services:
+        - http
+        - https
+        - dns
+      vulnerabilities:
+        - CVE-2021-44228
+        - CVE-2023-44487
+      sensitivity: low
+
+    H2:
+      os: linux
+      services:
+        - http
+        - smtp
+      vulnerabilities:
+        - CVE-2022-22965
+        - CVE-2021-26855
+      sensitivity: low
+
+    # Internal tier (application servers)
+    H3:
+      os: windows
+      services:
+        - smb
+        - rdp
+        - http
+      vulnerabilities:
+        - CVE-2021-34527
+        - CVE-2020-1472
+        - CVE-2017-0144
+      sensitivity: medium
+
+    H4:
+      os: linux
+      services:
+        - ssh
+        - http
+        - docker
+      vulnerabilities:
+        - CVE-2022-0847
+        - CVE-2021-3156
+        - CVE-2021-4034
+      sensitivity: medium
+
+    H5:
+      os: windows
+      services:
+        - rdp
+        - mssql
+        - smb
+      vulnerabilities:
+        - CVE-2019-0708
+        - CVE-2020-0796
+        - CVE-2021-1675
+      sensitivity: medium
+
+    # Database tier (high value targets)
+    H6:
+      os: linux
+      services:
+        - postgresql
+        - ssh
+      vulnerabilities:
+        - CVE-2023-0386
+        - CVE-2022-2588
+        - CVE-2021-3493
+        - CVE-2016-5195
+      sensitivity: high
+
+    H7:
+      os: windows
+      services:
+        - mssql
+        - smb
+      vulnerabilities:
+        - CVE-2020-1472
+        - CVE-2021-34527
+        - CVE-2019-0708
+        - CVE-2017-0144
+      sensitivity: high
+
+    H8:
+      os: linux
+      services:
+        - mongodb
+        - ssh
+      vulnerabilities:
+        - CVE-2021-44228
+        - CVE-2022-0847
+        - CVE-2021-4034
+        - CVE-2023-0386
+      sensitivity: high
+
+  edges:
+    # DMZ to Internal
+    - ["H1", "H3"]
+    - ["H1", "H4"]
+    - ["H2", "H4"]
+    - ["H2", "H5"]
+    # Internal cross-links
+    - ["H3", "H4"]
+    - ["H3", "H5"]
+    - ["H4", "H5"]
+    # Internal to Database
+    - ["H3", "H6"]
+    - ["H4", "H7"]
+    - ["H5", "H7"]
+    - ["H5", "H8"]
+    - ["H4", "H8"]

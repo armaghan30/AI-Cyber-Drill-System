@@ -1,0 +1,54 @@
+network:
+  hosts:
+    H1:
+      os: windows
+      services:
+        - rdp
+        - smb
+        - http
+      vulnerabilities:
+        - CVE-2021-34527
+        - CVE-2020-0796
+        - CVE-2017-0144
+      sensitivity: low
+
+    H2:
+      os: linux
+      services:
+        - ssh
+        - http
+      vulnerabilities:
+        - CVE-2022-0847
+        - CVE-2021-3156
+        - CVE-2016-5195
+      sensitivity: medium
+
+    H3:
+      os: windows
+      services:
+        - smb
+        - mssql
+      vulnerabilities:
+        - CVE-2020-1472
+        - CVE-2019-0708
+        - CVE-2021-1675
+      sensitivity: medium
+
+    H4:
+      os: linux
+      services:
+        - ssh
+        - postgresql
+        - http
+      vulnerabilities:
+        - CVE-2021-4034
+        - CVE-2022-2588
+        - CVE-2023-0386
+        - CVE-2021-3493
+      sensitivity: high
+
+  edges:
+    - ["H1", "H2"]
+    - ["H1", "H3"]
+    - ["H2", "H4"]
+    - ["H3", "H4"]

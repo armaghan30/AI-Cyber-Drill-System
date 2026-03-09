@@ -1,0 +1,25 @@
+network:
+  hosts:
+    H1:
+      os: windows
+      services:
+        - rdp
+        - smb
+      vulnerabilities:
+        - CVE-2021-34527
+        - CVE-2020-0796
+        - CVE-2017-0144
+      sensitivity: low
+
+    H2:
+      os: linux
+      services:
+        - ssh
+      vulnerabilities:
+        - CVE-2022-0847
+        - CVE-2021-3156
+        - CVE-2016-5195
+      sensitivity: high
+
+  edges:
+    - ["H1", "H2"]
