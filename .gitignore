@@ -1,0 +1,46 @@
+# Virtual environments
+cyber_env/
+env/
+venv/
+.venv/
+
+# Python cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Editor / OS
+.vscode/
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Model files (too large for git)
+results/models/
+*.pth
+*.zip
+
+# TensorBoard logs
+tb_logs/
+
+# Pip artifacts
+=*
+
+# Pytest cache
+.pytest_cache/
+
+# Local experiment files
+models_local/
+results_local/
+
+# SQLite database
+*.db
+
+# Simulation output
+simulation_log.json
+
+# Frontend build
+frontend/node_modules/
+frontend/dist/

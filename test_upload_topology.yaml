@@ -1,0 +1,58 @@
+network:
+  hosts:
+    WebServer:
+      os: linux
+      services:
+        - http
+        - https
+        - ssh
+      vulnerabilities:
+        - CVE-2023-44487
+        - CVE-2021-41773
+      sensitivity: medium
+
+    AppServer:
+      os: linux
+      services:
+        - tomcat
+        - ssh
+      vulnerabilities:
+        - CVE-2023-46604
+      sensitivity: high
+
+    DatabaseServer:
+      os: linux
+      services:
+        - mysql
+        - ssh
+      vulnerabilities:
+        - CVE-2023-21912
+        - CVE-2022-21270
+      sensitivity: high
+
+    FileServer:
+      os: windows
+      services:
+        - smb
+        - rdp
+      vulnerabilities:
+        - CVE-2021-34527
+      sensitivity: low
+
+    MailServer:
+      os: linux
+      services:
+        - smtp
+        - imap
+        - ssh
+      vulnerabilities:
+        - CVE-2023-42793
+        - CVE-2021-3156
+      sensitivity: medium
+
+  edges:
+    - ["WebServer", "AppServer"]
+    - ["AppServer", "DatabaseServer"]
+    - ["WebServer", "FileServer"]
+    - ["FileServer", "MailServer"]
+    - ["AppServer", "MailServer"]

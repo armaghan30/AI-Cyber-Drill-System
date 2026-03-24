@@ -1,0 +1,51 @@
+network:
+  hosts:
+    WebServer:
+      os: linux
+      services:
+        - http
+        - https
+        - ssh
+      vulnerabilities:
+        - CVE-2023-44487
+        - CVE-2021-41773
+        - CVE-2019-0211
+      sensitivity: high
+
+    EmployeeWorkstation:
+      os: windows
+      services:
+        - rdp
+        - smb
+      vulnerabilities:
+        - CVE-2021-34527
+      sensitivity: low
+
+    DatabaseServer:
+      os: linux
+      services:
+        - mysql
+        - ssh
+      vulnerabilities:
+        - CVE-2023-21912
+        - CVE-2022-21270
+        - CVE-2020-14812
+        - CVE-2019-2737
+      sensitivity: high
+
+    FileServer:
+      os: windows
+      services:
+        - smb
+        - ftp
+        - rdp
+      vulnerabilities:
+        - CVE-2020-0796
+        - CVE-2017-0144
+      sensitivity: medium
+
+  edges:
+    - ["WebServer", "DatabaseServer"]
+    - ["WebServer", "EmployeeWorkstation"]
+    - ["EmployeeWorkstation", "FileServer"]
+    - ["FileServer", "DatabaseServer"]
