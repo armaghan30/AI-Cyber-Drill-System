@@ -23,6 +23,12 @@ class RewardEngine:
         if red_action:
             a_type = red_action.get("action")
             target = red_action.get("target")
+            reason = red_action.get("reason", "")
+
+            # Bonus when firewall blocks Red attack
+            if reason == "firewall_blocked" and a_type in ("exploit", "lateral_move"):
+                blue_r += 10.0
+                red_r -= 3.0
 
             if a_type == "scan" and target in new_hosts:
                 red_r += 1.0
@@ -85,7 +91,7 @@ class RewardEngine:
             prev_comp = bool(prev_hosts.get(host_name, {}).get("is_compromised", False))
             if new_comp and not prev_comp:
                 red_r += 25.0
-                blue_r -= 10.0
+                blue_r -= 6.0
 
         # ---------------------- BLUE ACTION REWARDS ----------------------
         if blue_action:
@@ -96,7 +102,7 @@ class RewardEngine:
                 prev_vulns = prev_hosts.get(target, {}).get("vulnerabilities", [])
                 new_vulns = new_hosts.get(target, {}).get("vulnerabilities", [])
                 if len(new_vulns) < len(prev_vulns):
-                    blue_r += 6.0
+                    blue_r += 8.0
                 else:
                     blue_r -= 1.0
 
@@ -108,7 +114,7 @@ class RewardEngine:
                 prev_comp = bool(prev_hosts.get(target, {}).get("is_compromised", False))
                 new_comp = bool(new_hosts[target].get("is_compromised", False))
                 if prev_comp and not new_comp:
-                    blue_r += 12.0
+                    blue_r += 18.0
                     red_r -= 8.0
                 else:
                     blue_r -= 3.0
@@ -117,7 +123,7 @@ class RewardEngine:
                 detected = blue_action.get("detected", False)
                 prev_comp = bool(prev_hosts.get(target, {}).get("is_compromised", False))
                 if detected:
-                    blue_r += 8.0
+                    blue_r += 12.0
                     red_r -= 2.0
                 elif prev_comp:
                     blue_r -= 1.0
@@ -132,6 +138,14 @@ class RewardEngine:
                     red_r -= 2.0
                 else:
                     blue_r -= 1.0
+
+            elif b_type == "deploy_firewall" and target in new_hosts:
+                newly_deployed = blue_action.get("newly_deployed", True)
+                if newly_deployed:
+                    blue_r += 10.0
+                    red_r -= 2.0
+                else:
+                    blue_r -= 1.0  # wasted action: firewall already active
 
             elif b_type == "idle":
                 pass

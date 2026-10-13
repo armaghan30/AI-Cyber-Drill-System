@@ -1,0 +1,3 @@
+# Language statistics: the project's core (RL environments, agents, backend) is Python.
+# The React dashboard in frontend/ is excluded from GitHub's language bar only; it is still part of the repo.
+frontend/** linguist-detectable=false

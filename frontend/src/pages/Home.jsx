@@ -62,7 +62,7 @@ const Home = () => {
     },
     {
       icon: FaDatabase, title: 'Training Results',
-      desc: 'Browse pre-computed DQN training data — CSVs, reward plots, and raw episode data for all network topologies.',
+      desc: 'Browse pre-computed PPO training data — CSVs, reward plots, and raw episode data for all network topologies.',
       path: '/training-results', color: 'text-yellow-400', border: 'border-yellow-600/30'
     },
     {
@@ -74,8 +74,8 @@ const Home = () => {
 
   const howItWorks = [
     { step: '01', title: 'Upload Network Topology', desc: 'Define your network as a YAML file — hosts, services, vulnerabilities, and connections.' },
-    { step: '02', title: 'AI Agents Train', desc: 'Red (attacker) and Blue (defender) agents learn optimal strategies using Deep Q-Networks (DQN).' },
-    { step: '03', title: 'Run Simulations', desc: 'Pit the trained agents against each other. Watch each step — scans, exploits, patches, and isolations.' },
+    { step: '02', title: 'AI Agents Train', desc: 'Red (attacker) and Blue (defender) agents are trained sequentially with curriculum-based MaskablePPO — Red first, then Blue against a fixed Red policy.' },
+    { step: '03', title: 'Run Simulations', desc: 'The trained agents take turns each step on your topology — scans, exploits, patches, and isolations — so you can see the drill unfold.' },
     { step: '04', title: 'Analyse & Report', desc: 'Get a full security report with defense effectiveness scores, vulnerability analysis, and recommendations.' },
   ]
 
@@ -132,7 +132,7 @@ const Home = () => {
             <p>
               The system trains two AI agents — a <span className="text-red-400 font-bold">Red Agent</span> (attacker)
               and a <span className="text-blue-400 font-bold">Blue Agent</span> (defender) — using
-              Deep Q-Network (DQN) algorithms from Stable Baselines3.
+              Proximal Policy Optimization (PPO) reinforcement learning from Stable Baselines3.
             </p>
             <p>
               Organizations can use this platform to test their network security, identify vulnerabilities,
@@ -141,7 +141,7 @@ const Home = () => {
           </div>
           <div className="space-y-3">
             {[
-              { label: 'Reinforcement Learning', desc: 'SB3 DQN agents that learn over thousands of episodes', icon: FaBrain },
+              { label: 'Reinforcement Learning', desc: 'SB3 PPO agents that learn over thousands of episodes', icon: FaBrain },
               { label: 'YAML Topologies', desc: 'Define any network structure with hosts, services, and CVEs', icon: FaNetworkWired },
               { label: 'Security Reports', desc: 'Auto-generated reports with risk scores and action items', icon: FaLock },
             ].map((item, i) => {

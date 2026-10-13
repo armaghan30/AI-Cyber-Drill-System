@@ -1,0 +1,130 @@
+network:
+  name: BranchOfficeNet
+
+  hosts:
+
+    # ── Perimeter ──────────────────────────────────────────────
+    FW01:
+      os: linux
+      sensitivity: low
+      services: [ssh, dns, http]
+      vulnerabilities:
+        - CVE-2021-20322   # BIND DNS cache poisoning
+        - CVE-2022-0778    # OpenSSL infinite loop
+
+    PROXY01:
+      os: linux
+      sensitivity: low
+      services: [http, https, ssh]
+      vulnerabilities:
+        - CVE-2021-44228   # Log4Shell (proxy logging)
+        - CVE-2023-44487   # HTTP/2 rapid-reset
+
+    # ── DMZ / Application tier ─────────────────────────────────
+    WEB01:
+      os: linux
+      sensitivity: medium
+      services: [http, https, ssh]
+      vulnerabilities:
+        - CVE-2022-22965   # Spring4Shell
+        - CVE-2021-41773   # Apache path traversal
+        - CVE-2021-44228   # Log4Shell
+
+    APP01:
+      os: linux
+      sensitivity: medium
+      services: [http, ssh, docker]
+      vulnerabilities:
+        - CVE-2022-0847    # Dirty Pipe (Linux priv-esc)
+        - CVE-2021-4034    # Polkit pkexec
+        - CVE-2021-3156    # Sudo heap overflow
+
+    APP02:
+      os: windows
+      sensitivity: medium
+      services: [http, rdp, smb]
+      vulnerabilities:
+        - CVE-2021-34527   # PrintNightmare
+        - CVE-2022-30190   # Follina MSDT
+        - CVE-2020-1472    # Zerologon
+
+    # ── Internal infrastructure ────────────────────────────────
+    FILE01:
+      os: windows
+      sensitivity: medium
+      services: [smb, rdp]
+      vulnerabilities:
+        - CVE-2017-0144    # EternalBlue
+        - CVE-2020-0796    # SMBGhost
+        - CVE-2021-34527   # PrintNightmare
+
+    DC01:
+      os: windows
+      sensitivity: high
+      services: [rdp, smb, dns]
+      vulnerabilities:
+        - CVE-2020-1472    # Zerologon (critical — domain controller)
+        - CVE-2021-42278   # sAMAccountName spoofing
+        - CVE-2021-42287   # noPac privilege escalation
+
+    # ── Database tier (crown jewels) ──────────────────────────
+    DB01:
+      os: linux
+      sensitivity: high
+      services: [mysql, ssh]
+      vulnerabilities:
+        - CVE-2021-3449    # OpenSSL NULL pointer
+        - CVE-2022-1292    # OpenSSL c_rehash command injection
+        - CVE-2023-0386    # OverlayFS priv-esc
+
+    DB02:
+      os: windows
+      sensitivity: high
+      services: [mssql, smb, rdp]
+      vulnerabilities:
+        - CVE-2019-0708    # BlueKeep (critical RDP)
+        - CVE-2021-34527   # PrintNightmare
+        - CVE-2020-1472    # Zerologon
+
+    # ── Endpoint ───────────────────────────────────────────────
+    WS01:
+      os: windows
+      sensitivity: low
+      services: [rdp, smb, http]
+      vulnerabilities:
+        - CVE-2022-30190   # Follina MSDT
+        - CVE-2021-40444   # MSHTML remote code exec
+
+  edges:
+    # Perimeter → DMZ
+    - [FW01,   PROXY01]
+    - [FW01,   WEB01]
+    - [PROXY01, WEB01]
+    - [PROXY01, APP01]
+    # DMZ → Internal
+    - [WEB01,  APP01]
+    - [WEB01,  APP02]
+    - [APP01,  FILE01]
+    - [APP02,  FILE01]
+    - [APP01,  DC01]
+    - [APP02,  DC01]
+    # Internal → Databases
+    - [APP01,  DB01]
+    - [APP02,  DB02]
+    - [DC01,   DB01]
+    - [DC01,   DB02]
+    - [FILE01, DB02]
+    # Endpoint access
+    - [WS01,   APP02]
+    - [WS01,   FILE01]
+
+  firewall_rules:
+    DC01:
+      block_services: [rdp, smb]
+      block_inbound_from: []
+    DB01:
+      block_services: [mysql, ssh]
+      block_inbound_from: []
+    DB02:
+      block_services: [mssql, smb]
+      block_inbound_from: []

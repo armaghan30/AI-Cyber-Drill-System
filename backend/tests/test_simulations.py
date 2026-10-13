@@ -1,5 +1,9 @@
+from backend.tests.conftest import FIXTURE_TOPO
+
+
 def _make_scenario(client):
-    r = client.post("/api/scenarios/", json={"name": "Sim Test", "filename": "sample_topology.yaml"})
+    with open(FIXTURE_TOPO, "rb") as f:
+        r = client.post("/api/scenarios/upload", files={"file": ("test_topology.yaml", f, "application/octet-stream")})
     return r.json()["id"]
 
 
@@ -59,3 +63,16 @@ def test_get_detail(client):
 def test_bad_scenario(client):
     r = client.post("/api/simulations/run", json={"scenario_id": 999, "max_steps": 5})
     assert r.status_code == 400
+
+
+def test_untrained_topology_returns_409(client, monkeypatch):
+    # simulations require a trained Red/Blue model pair — there is no rule-based fallback
+    from backend.services import simulation_service
+
+    def _no_models(topo):
+        raise simulation_service.NoTrainedModelError("no trained model pair")
+
+    monkeypatch.setattr(simulation_service, "_load_sb3_models", _no_models)
+    sid = _make_scenario(client)
+    r = client.post("/api/simulations/run", json={"scenario_id": sid, "max_steps": 3})
+    assert r.status_code == 409

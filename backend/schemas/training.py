@@ -6,7 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field
 class TrainingCreate(BaseModel):
     scenario_id: int
     agent_role: str = Field(..., pattern="^(red|blue)$")
-    algorithm: str = Field(..., pattern="^(dqn|ppo)$")
+    algorithm: str = Field(..., pattern="^(dqn|ppo|maskable_ppo)$")
     total_timesteps: int = Field(default=10000, ge=1000, le=1000000)
     max_steps_per_episode: int = Field(default=20, ge=5, le=100)
 

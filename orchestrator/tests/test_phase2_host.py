@@ -26,7 +26,7 @@ def test_host_repr_includes_new_fields():
 
 
 def test_environment_reset_clears_new_fields():
-    loader = YAMLLoader("orchestrator/sample_topology.yaml")
+    loader = YAMLLoader("orchestrator/baselines/sample_topology.yaml")
     topo = loader.parse()
     env = Environment(topo)
 

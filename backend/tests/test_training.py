@@ -1,5 +1,9 @@
+from backend.tests.conftest import FIXTURE_TOPO
+
+
 def _make_scenario(client):
-    r = client.post("/api/scenarios/", json={"name": "Train Test", "filename": "sample_topology.yaml"})
+    with open(FIXTURE_TOPO, "rb") as f:
+        r = client.post("/api/scenarios/upload", files={"file": ("test_topology.yaml", f, "application/octet-stream")})
     return r.json()["id"]
 
 
@@ -7,7 +11,7 @@ def test_start_training(client):
     sid = _make_scenario(client)
     r = client.post("/api/training/", json={
         "scenario_id": sid, "agent_role": "red",
-        "algorithm": "dqn", "total_timesteps": 1000,
+        "algorithm": "maskable_ppo", "total_timesteps": 1000,
     })
     assert r.status_code == 202
     d = r.json()
@@ -19,7 +23,7 @@ def test_list_runs(client):
     sid = _make_scenario(client)
     client.post("/api/training/", json={
         "scenario_id": sid, "agent_role": "blue",
-        "algorithm": "dqn", "total_timesteps": 1000,
+        "algorithm": "maskable_ppo", "total_timesteps": 1000,
     })
     r = client.get("/api/training/")
     assert r.status_code == 200
@@ -30,7 +34,7 @@ def test_get_run(client):
     sid = _make_scenario(client)
     r = client.post("/api/training/", json={
         "scenario_id": sid, "agent_role": "red",
-        "algorithm": "dqn", "total_timesteps": 1000,
+        "algorithm": "maskable_ppo", "total_timesteps": 1000,
     })
     run_id = r.json()["id"]
     r = client.get(f"/api/training/{run_id}")
@@ -42,7 +46,7 @@ def test_bad_role(client):
     sid = _make_scenario(client)
     r = client.post("/api/training/", json={
         "scenario_id": sid, "agent_role": "green",
-        "algorithm": "dqn", "total_timesteps": 1000,
+        "algorithm": "maskable_ppo", "total_timesteps": 1000,
     })
     assert r.status_code == 422
 

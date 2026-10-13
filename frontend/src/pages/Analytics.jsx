@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FaChartLine, FaChartBar, FaServer, FaShieldAlt, FaExclamationTriangle,
   FaNetworkWired, FaCheckCircle, FaSkull, FaArrowRight, FaInfoCircle, FaFileAlt, FaSync,
-  FaCrosshairs
+  FaCrosshairs, FaRoute, FaDatabase
 } from 'react-icons/fa'
 import {
   AreaChart, Area, BarChart, Bar,
@@ -13,28 +13,42 @@ import api from '../api'
 
 const font = { fontFamily: 'Gugi, sans-serif' }
 
-// CVE severity database
+// CVE severity database — covers all topology CVEs used in 4/8/50-host topologies
 const CVE_DB = {
-  'CVE-2021-34527': { name: 'PrintNightmare', severity: 'CRITICAL', service: 'Print Spooler', fix: 'Disable Print Spooler or apply KB5004945' },
-  'CVE-2020-0796': { name: 'SMBGhost', severity: 'CRITICAL', service: 'SMBv3', fix: 'Apply KB4551762 or disable SMBv3 compression' },
-  'CVE-2017-0144': { name: 'EternalBlue', severity: 'CRITICAL', service: 'SMBv1', fix: 'Apply MS17-010 and disable SMBv1' },
-  'CVE-2022-0847': { name: 'DirtyPipe', severity: 'HIGH', service: 'Linux Kernel', fix: 'Update kernel to 5.16.11+' },
-  'CVE-2021-3156': { name: 'Baron Samedit', severity: 'HIGH', service: 'sudo', fix: 'Update sudo to 1.9.5p2+' },
-  'CVE-2016-5195': { name: 'DirtyCow', severity: 'HIGH', service: 'Linux Kernel', fix: 'Update kernel to 4.8.3+' },
-  'CVE-2020-1472': { name: 'Zerologon', severity: 'CRITICAL', service: 'Netlogon', fix: 'Apply August 2020 security update' },
-  'CVE-2019-0708': { name: 'BlueKeep', severity: 'CRITICAL', service: 'RDP', fix: 'Apply KB4499175 or enable NLA' },
-  'CVE-2021-1675': { name: 'PrintNightmare v2', severity: 'HIGH', service: 'Print Spooler', fix: 'Disable Print Spooler on non-print servers' },
-  'CVE-2021-4034': { name: 'PwnKit', severity: 'HIGH', service: 'polkit', fix: 'Update polkit to 0.120+' },
-  'CVE-2022-2588': { name: 'DirtyCred', severity: 'HIGH', service: 'Linux Kernel', fix: 'Update kernel to latest stable' },
-  'CVE-2023-0386': { name: 'OverlayFS Priv Esc', severity: 'HIGH', service: 'Linux Kernel', fix: 'Update kernel to 6.2+' },
-  'CVE-2021-3493': { name: 'OverlayFS Ubuntu', severity: 'HIGH', service: 'Linux Kernel', fix: 'Update Ubuntu kernel packages' },
-  'CVE-2023-44487': { name: 'HTTP/2 Rapid Reset', severity: 'CRITICAL', service: 'HTTP/2', fix: 'Update web server to patched version' },
-  'CVE-2021-41773': { name: 'Apache Path Traversal', severity: 'CRITICAL', service: 'Apache httpd', fix: 'Update Apache to 2.4.50+' },
-  'CVE-2019-0211': { name: 'Apache Priv Esc', severity: 'HIGH', service: 'Apache httpd', fix: 'Update Apache to 2.4.39+' },
-  'CVE-2023-21912': { name: 'MySQL Server DoS', severity: 'HIGH', service: 'MySQL', fix: 'Apply Oracle Critical Patch Update' },
-  'CVE-2022-21270': { name: 'MySQL Server Exploit', severity: 'MEDIUM', service: 'MySQL', fix: 'Apply Oracle Jan 2022 CPU' },
-  'CVE-2020-14812': { name: 'MySQL Server DoS v2', severity: 'MEDIUM', service: 'MySQL', fix: 'Update MySQL to 8.0.22+' },
-  'CVE-2019-2737': { name: 'MySQL Server XML Vuln', severity: 'MEDIUM', service: 'MySQL', fix: 'Update MySQL to 5.7.27+' },
+  // Windows / Microsoft
+  'CVE-2021-34527': { name: 'PrintNightmare',          severity: 'CRITICAL', service: 'Print Spooler',    fix: 'Disable Print Spooler or apply KB5004945' },
+  'CVE-2021-1675':  { name: 'PrintNightmare v2',       severity: 'HIGH',     service: 'Print Spooler',    fix: 'Disable Print Spooler on non-print servers' },
+  'CVE-2020-0796':  { name: 'SMBGhost',                severity: 'CRITICAL', service: 'SMBv3',            fix: 'Apply KB4551762 or disable SMBv3 compression' },
+  'CVE-2017-0144':  { name: 'EternalBlue',             severity: 'CRITICAL', service: 'SMBv1',            fix: 'Apply MS17-010 and disable SMBv1' },
+  'CVE-2020-1472':  { name: 'Zerologon',               severity: 'CRITICAL', service: 'Netlogon',         fix: 'Apply August 2020 security update' },
+  'CVE-2019-0708':  { name: 'BlueKeep',                severity: 'CRITICAL', service: 'RDP',              fix: 'Apply KB4499175 or enable NLA' },
+  'CVE-2021-26855': { name: 'ProxyLogon',              severity: 'CRITICAL', service: 'Exchange Server',  fix: 'Apply Exchange cumulative updates immediately' },
+  'CVE-2021-26857': { name: 'Exchange Deserialization', severity: 'HIGH',    service: 'Exchange Server',  fix: 'Apply Microsoft Exchange security updates (March 2021)' },
+  'CVE-2021-34535': { name: 'RDP Client RCE',          severity: 'CRITICAL', service: 'Remote Desktop',   fix: 'Apply KB5004237 and restrict RDP client exposure' },
+  'CVE-2022-21990': { name: 'RDP Client RCE v2',       severity: 'HIGH',     service: 'Remote Desktop',   fix: 'Apply February 2022 Patch Tuesday updates' },
+  'CVE-2022-26923': { name: 'AD CS Priv Esc',          severity: 'CRITICAL', service: 'Active Directory', fix: 'Apply KB5014754 and audit AD CS templates' },
+  'CVE-2023-23397': { name: 'Outlook Elevation',       severity: 'CRITICAL', service: 'Outlook',          fix: 'Apply Microsoft security update, block TCP 445 outbound' },
+  'CVE-2022-30190': { name: 'Follina',                 severity: 'HIGH',     service: 'MSDT',             fix: 'Disable MSDT URL protocol, apply Microsoft update' },
+  // Linux
+  'CVE-2022-0847':  { name: 'DirtyPipe',               severity: 'HIGH',     service: 'Linux Kernel',     fix: 'Update kernel to 5.16.11+' },
+  'CVE-2021-3156':  { name: 'Baron Samedit',           severity: 'HIGH',     service: 'sudo',             fix: 'Update sudo to 1.9.5p2+' },
+  'CVE-2016-5195':  { name: 'DirtyCow',                severity: 'HIGH',     service: 'Linux Kernel',     fix: 'Update kernel to 4.8.3+' },
+  'CVE-2021-4034':  { name: 'PwnKit',                  severity: 'HIGH',     service: 'polkit',           fix: 'Update polkit to 0.120+' },
+  'CVE-2022-2588':  { name: 'DirtyCred',               severity: 'HIGH',     service: 'Linux Kernel',     fix: 'Update kernel to latest stable' },
+  'CVE-2023-0386':  { name: 'OverlayFS Priv Esc',      severity: 'HIGH',     service: 'Linux Kernel',     fix: 'Update kernel to 6.2+' },
+  'CVE-2021-3493':  { name: 'OverlayFS Ubuntu',        severity: 'HIGH',     service: 'Linux Kernel',     fix: 'Update Ubuntu kernel packages' },
+  // Web / App servers
+  'CVE-2021-44228': { name: 'Log4Shell',               severity: 'CRITICAL', service: 'Apache Log4j',    fix: 'Upgrade Log4j to 2.17.1+' },
+  'CVE-2022-22965': { name: 'Spring4Shell',            severity: 'CRITICAL', service: 'Spring Framework', fix: 'Upgrade Spring Framework to 5.3.18+' },
+  'CVE-2023-44487': { name: 'HTTP/2 Rapid Reset',      severity: 'CRITICAL', service: 'HTTP/2',           fix: 'Update web server to patched version' },
+  'CVE-2021-41773': { name: 'Apache Path Traversal',   severity: 'CRITICAL', service: 'Apache httpd',     fix: 'Update Apache to 2.4.50+' },
+  'CVE-2019-0211':  { name: 'Apache Priv Esc',         severity: 'HIGH',     service: 'Apache httpd',     fix: 'Update Apache to 2.4.39+' },
+  'CVE-2023-0286':  { name: 'OpenSSL X.509 Confusion', severity: 'HIGH',     service: 'OpenSSL',          fix: 'Upgrade OpenSSL to 3.0.8+' },
+  // Database
+  'CVE-2023-21912': { name: 'MySQL Server DoS',        severity: 'HIGH',     service: 'MySQL',            fix: 'Apply Oracle Critical Patch Update' },
+  'CVE-2022-21270': { name: 'MySQL Server Exploit',    severity: 'MEDIUM',   service: 'MySQL',            fix: 'Apply Oracle Jan 2022 CPU' },
+  'CVE-2020-14812': { name: 'MySQL Server DoS v2',     severity: 'MEDIUM',   service: 'MySQL',            fix: 'Update MySQL to 8.0.22+' },
+  'CVE-2019-2737':  { name: 'MySQL Server XML Vuln',   severity: 'MEDIUM',   service: 'MySQL',            fix: 'Update MySQL to 5.7.27+' },
 }
 
 
@@ -54,7 +68,9 @@ const Analytics = () => {
   const [runs, setRuns] = useState([])
   const [defenseData, setDefenseData] = useState(null)
   const [selectedSim, setSelectedSim] = useState(null) // full sim detail with steps
+  const [attackPath, setAttackPath] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [cveExtras, setCveExtras] = useState({}) // NVD-fetched data for CVEs not in local dict
 
   useEffect(() => { loadAll() }, [])
 
@@ -62,25 +78,34 @@ const Analytics = () => {
     setLoading(true)
     try {
       const [scList, smList, trList] = await Promise.all([
-        api.listMyScenarios().catch(() => []),
-        api.listMySimulations().catch(() => []),
-        api.listMyTrainingRuns().catch(() => []),
+        api.listScenarios().catch(() => []),
+        api.listSimulations().catch(() => []),
+        api.listTrainingRuns().catch(() => []),
       ])
       setScenarios(scList); setSims(smList); setRuns(trList)
 
       // load defense analysis
       try { setDefenseData(await api.defenseAnalysis()) } catch {}
 
-      // auto-select first scenario and load its topology
-      if (scList.length > 0) {
-        setSelectedScId(scList[0].id)
-        try { setTopoDetail(await api.getScenario(scList[0].id)) } catch {}
+      // Auto-select the scenario that was most recently simulated so topology and
+      // simulation data always refer to the same run. Fall back to scList[0].
+      let targetScId = scList.length > 0 ? scList[0].id : null
+      if (smList.length > 0 && scList.length > 0) {
+        const latestScId = smList[0].scenario_id
+        if (scList.find(s => s.id === latestScId)) targetScId = latestScId
+      }
+      if (targetScId !== null) {
+        setSelectedScId(targetScId)
+        try { setTopoDetail(await api.getScenario(targetScId)) } catch {}
       }
 
-      // load latest simulation detail
+      // load latest simulation detail + attack path
       if (smList.length > 0) {
         const latest = smList[0]
-        try { setSelectedSim(await api.getSimulation(latest.id)) } catch {}
+        try {
+          setSelectedSim(await api.getSimulation(latest.id))
+          try { setAttackPath(await api.getAttackPath(latest.id)) } catch {}
+        } catch {}
       }
     } catch {}
     setLoading(false)
@@ -89,10 +114,40 @@ const Analytics = () => {
   const switchScenario = async (id) => {
     setSelectedScId(id)
     try { setTopoDetail(await api.getScenario(id)) } catch {}
+    // Also load the most recent simulation for this scenario so charts sync
+    const scenarioSim = sims.find(s => s.scenario_id === id)
+    if (scenarioSim) {
+      try {
+        setSelectedSim(await api.getSimulation(scenarioSim.id))
+        try { setAttackPath(await api.getAttackPath(scenarioSim.id)) } catch { setAttackPath(null) }
+      } catch {}
+    } else {
+      setSelectedSim(null)
+      setAttackPath(null)
+    }
   }
 
+  // Batch-fetch CVE data from NVD for any CVE not in the local dictionary
+  useEffect(() => {
+    if (!topoDetail) return
+    const raw = typeof topoDetail.topology_data === 'string' ? JSON.parse(topoDetail.topology_data) : topoDetail.topology_data
+    const allIds = Object.values(raw?.network?.hosts || {}).flatMap(h => h.vulnerabilities || [])
+    const unknown = [...new Set(allIds)].filter(id => !CVE_DB[id])
+    if (unknown.length === 0) return
+    api.getCVEBatch(unknown)
+      .then(data => setCveExtras(prev => ({ ...prev, ...data })))
+      .catch(() => {})
+  }, [topoDetail])
+
+  // Merged CVE lookup — local dict first, NVD cache second, fallback third
+  const cveInfo = (id) =>
+    CVE_DB[id] || cveExtras[id] || { name: id, severity: 'MEDIUM', service: 'Unknown', fix: 'Apply vendor security patch' }
+
   const loadSimDetail = async (simId) => {
-    try { setSelectedSim(await api.getSimulation(simId)) } catch {}
+    try {
+      setSelectedSim(await api.getSimulation(simId))
+      try { setAttackPath(await api.getAttackPath(simId)) } catch { setAttackPath(null) }
+    } catch {}
   }
 
   // ═══ TOPOLOGY DATA ═══
@@ -104,8 +159,8 @@ const Analytics = () => {
   const hostVulnData = hostNames.map(name => {
     const h = hosts[name]
     const vulns = h.vulnerabilities || []
-    const crit = vulns.filter(v => CVE_DB[v]?.severity === 'CRITICAL').length
-    const high = vulns.filter(v => CVE_DB[v]?.severity === 'HIGH').length
+    const crit = vulns.filter(v => cveInfo(v)?.severity === 'CRITICAL').length
+    const high = vulns.filter(v => cveInfo(v)?.severity === 'HIGH').length
     const medium = vulns.length - crit - high
     return {
       host: name, os: h.os, services: h.services?.length || 0,
@@ -118,7 +173,7 @@ const Analytics = () => {
   const allCVEs = []
   hostNames.forEach(name => {
     ;(hosts[name]?.vulnerabilities || []).forEach(cve => {
-      const info = CVE_DB[cve] || { name: cve, severity: 'MEDIUM', service: 'Unknown', fix: 'Apply vendor patch' }
+      const info = cveInfo(cve)
       allCVEs.push({ cve, host: name, ...info })
     })
   })
@@ -146,9 +201,7 @@ const Analytics = () => {
   const redActBar = Object.entries(redActionCounts).map(([name, value]) => ({ name, value }))
   const blueActBar = Object.entries(blueActionCounts).map(([name, value]) => ({ name, value }))
 
-  // defense stats
-  const blueWins = defenseData?.blue_wins || 0
-  const redWins = defenseData?.red_wins || 0
+  // defense stats (used only for top overview cards)
   const winRate = defenseData?.win_rate || 0
   const totalSims = defenseData?.total_simulations || sims.length
 
@@ -223,35 +276,6 @@ const Analytics = () => {
       {/* ═══ NETWORK TOPOLOGY ANALYSIS ═══ */}
       {hostNames.length > 0 && (
         <>
-          {/* Host Risk Cards */}
-          <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
-            <h2 className="text-xl font-bold text-green-100 mb-4" style={font}>
-              <FaServer className="inline mr-2 text-green-400" />Host Risk Assessment — {topoDetail?.name}
-            </h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {hostVulnData.map(h => (
-                <div key={h.host} className={`bg-gray-900/30 border-2 p-4 ${h.risk > 30 ? 'border-red-600/50' : h.risk > 15 ? 'border-yellow-600/50' : 'border-green-600/50'}`}>
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-green-100 font-bold text-lg" style={font}>{h.host}</span>
-                    <span className={`text-xs px-2 py-0.5 border ${
-                      h.sensitivity === 'high' ? 'border-red-600/50 text-red-400 bg-red-900/20'
-                      : h.sensitivity === 'medium' ? 'border-yellow-600/50 text-yellow-400 bg-yellow-900/20'
-                      : 'border-green-600/50 text-green-400 bg-green-900/20'
-                    }`} style={font}>{h.sensitivity.toUpperCase()}</span>
-                  </div>
-                  <p className="text-green-200/50 text-xs mb-2" style={font}>{h.os} — {hosts[h.host]?.services?.join(', ')}</p>
-                  <div className="flex justify-between text-xs mb-1" style={font}>
-                    <span className="text-green-200/70">CVEs: {h.vulns} ({h.critical} critical)</span>
-                    <span className={`font-bold ${h.risk > 30 ? 'text-red-400' : h.risk > 15 ? 'text-yellow-400' : 'text-green-400'}`}>Risk: {h.risk}</span>
-                  </div>
-                  <div className="w-full bg-gray-900/50 h-2 border border-green-900/30 overflow-hidden">
-                    <div className="h-full" style={{ width: `${Math.min(100, h.risk * 2)}%`, background: h.risk > 30 ? '#dc2626' : h.risk > 15 ? '#f59e0b' : '#22c55e' }}></div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Charts Row 1: Severity Distribution + Vulns per Host */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Severity Distribution — horizontal bars instead of pie */}
@@ -347,7 +371,7 @@ const Analytics = () => {
         <>
           <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
             <h2 className="text-xl font-bold text-green-100 mb-4" style={font}>
-              <FaCrosshairs className="inline mr-2 text-red-400" />Latest Simulation Results — #{selectedSim.id}
+              <FaCrosshairs className="inline mr-2 text-red-400" />Latest Simulation Results — Drill #{Math.max(1, sims.length - sims.findIndex(s => s.id === selectedSim.id))}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
               <div className="bg-gray-900/30 p-3 border border-green-900/30"><p className="text-xs text-green-200/50" style={font}>Steps</p><p className="text-2xl font-bold text-green-100" style={font}>{selectedSim.total_steps}</p></div>
@@ -411,7 +435,7 @@ const Analytics = () => {
           <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
             <h2 className="text-xl font-bold text-green-100 mb-2" style={font}>Step-by-Step Breakdown</h2>
             <p className="text-green-200/50 text-sm mb-2" style={font}>Each step shows Red (attacker) action vs Blue (defender) response. A "Counter Match" means the Blue agent correctly chose the MITRE-aligned defense for the Red attack.</p>
-            <p className="text-blue-200/40 text-xs mb-4 italic" style={font}><FaInfoCircle className="inline mr-1" />Note: DQN agents select actions based on learned reward maximization, not a fixed kill-chain sequence. The Red agent may choose actions like 'exfiltrate' early if the model learned it yields higher reward in that state.</p>
+            <p className="text-blue-200/40 text-xs mb-4 italic" style={font}><FaInfoCircle className="inline mr-1" />Note: MaskablePPO agents select actions based on learned reward maximization, not a fixed kill-chain sequence. The Red agent may choose actions like 'exfiltrate' early if the model learned it yields higher reward in that state.</p>
             <div className="space-y-3 max-h-[500px] overflow-y-auto pr-2">
               {simSteps.map(s => {
                 const ra = s.red_action?.action || 'idle'
@@ -448,6 +472,104 @@ const Analytics = () => {
         </>
       )}
 
+      {/* ═══ ATTACK PATH ═══ */}
+      {attackPath && attackPath.entry_point && (
+        <div className="bg-gray-800/30 border-2 border-red-900/40 p-6 shadow-xl">
+          <h2 className="text-xl font-bold text-red-400 mb-1 flex items-center gap-2" style={font}>
+            <FaRoute className="text-red-400" /> Red Agent Attack Path
+          </h2>
+          <p className="text-green-200/50 text-sm mb-5" style={font}>
+            Full pathway the Red agent took through your network — from initial entry to exfiltration
+          </p>
+
+          {/* Path string banner */}
+          <div className="bg-gray-900/40 border border-red-900/30 p-4 mb-5 overflow-x-auto">
+            <p className="text-xs text-green-200/40 mb-2" style={font}>Attack Route</p>
+            <div className="flex items-center gap-1 flex-wrap">
+              {attackPath.path_string.split(' → ').map((node, i, arr) => (
+                <React.Fragment key={i}>
+                  <span className={`px-3 py-1.5 text-sm font-bold border ${
+                    node === 'INTERNET' ? 'border-blue-700/60 text-blue-300 bg-blue-900/20'
+                    : node === 'EXFIL'  ? 'border-red-700/60 text-red-300 bg-red-900/20'
+                    : 'border-orange-700/60 text-orange-300 bg-orange-900/20'
+                  }`} style={font}>{node}</span>
+                  {i < arr.length - 1 && <FaArrowRight className="text-red-500/60 text-xs flex-shrink-0" />}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          {/* Compromised path */}
+          {attackPath.compromised_path.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs text-green-200/50 mb-3" style={font}>Compromised Host Chain</p>
+              <div className="space-y-2">
+                {attackPath.compromised_path.map((item, i) => (
+                  <div key={i} className="flex items-center gap-3 bg-gray-900/30 border border-orange-900/30 p-3">
+                    <span className="text-orange-400 font-bold text-xs w-5 text-center" style={font}>{i + 1}</span>
+                    <FaServer className="text-orange-400 text-sm flex-shrink-0" />
+                    <span className="text-orange-200 font-bold text-sm" style={font}>{item.host}</span>
+                    <span className={`text-xs px-2 py-0.5 border ml-auto ${
+                      item.method === 'exploit'
+                        ? 'border-red-700/50 text-red-400 bg-red-900/10'
+                        : 'border-yellow-700/50 text-yellow-400 bg-yellow-900/10'
+                    }`} style={font}>{item.method === 'exploit' ? 'Exploited' : 'Lateral Move'}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Lateral movements */}
+          {attackPath.lateral_movements.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs text-green-200/50 mb-3" style={font}>Lateral Movements</p>
+              <div className="flex flex-wrap gap-2">
+                {attackPath.lateral_movements.map((m, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-gray-900/30 border border-yellow-900/30 px-3 py-2 text-sm">
+                    <span className="text-yellow-300 font-bold" style={font}>{m.from || '?'}</span>
+                    <FaArrowRight className="text-yellow-500/60 text-xs" />
+                    <span className="text-yellow-300 font-bold" style={font}>{m.to}</span>
+                    <span className="text-green-200/30 text-xs" style={font}>step {m.step}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Exfiltrated hosts */}
+          {attackPath.exfiltrated_hosts.length > 0 && (
+            <div className="mb-5">
+              <p className="text-xs text-green-200/50 mb-3" style={font}>Data Exfiltrated From</p>
+              <div className="flex flex-wrap gap-2">
+                {attackPath.exfiltrated_hosts.map((h, i) => (
+                  <div key={i} className="flex items-center gap-2 bg-red-900/20 border border-red-700/50 px-3 py-2 text-sm">
+                    <FaDatabase className="text-red-400 text-xs" />
+                    <span className="text-red-300 font-bold" style={font}>{h}</span>
+                    <span className="text-red-400 text-xs" style={font}>DATA STOLEN</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Summary stats */}
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3 pt-4 border-t border-red-900/30">
+            {[
+              { label: 'Total Actions', val: attackPath.total_actions },
+              { label: 'Successful Hits', val: attackPath.successful_actions },
+              { label: 'Hosts Breached', val: attackPath.compromised_path.length },
+              { label: 'Hosts Exfiltrated', val: attackPath.exfiltrated_hosts.length },
+            ].map((s, i) => (
+              <div key={i} className="bg-gray-900/30 border border-red-900/30 p-3 text-center">
+                <p className="text-xs text-green-200/40 mb-1" style={font}>{s.label}</p>
+                <p className="text-xl font-bold text-red-400" style={font}>{s.val}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* No simulation yet */}
       {(!selectedSim || simSteps.length === 0) && scenarios.length > 0 && (
         <div className="bg-gray-800/30 border-2 border-green-900/50 p-12 text-center shadow-xl space-y-3">
@@ -457,85 +579,6 @@ const Analytics = () => {
             className="px-5 py-2 border-2 border-green-700/50 text-green-200 hover:bg-green-900/30 transition-all text-sm" style={font}>
             Go to AI Orchestrator
           </button>
-        </div>
-      )}
-
-      {/* ═══ DEFENSE PERFORMANCE ═══ */}
-      {defenseData && defenseData.total_simulations > 0 && (
-        <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
-          <h2 className="text-xl font-bold text-green-100 mb-2" style={font}>
-            <FaShieldAlt className="inline mr-2 text-blue-400" />Overall Defense Performance
-          </h2>
-          <p className="text-green-200/50 text-sm mb-6" style={font}>
-            Every simulation is a battle between Red (attacker) and Blue (defender). The agent with the higher cumulative reward wins that round. This section tracks results across all your drills to show how well your network holds up under repeated attacks.
-          </p>
-
-          {/* Score cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-            <div className="bg-gray-900/30 border border-green-900/30 p-4 text-center">
-              <p className="text-xs text-green-200/50 mb-1" style={font}>Total Drills Run</p>
-              <p className="text-3xl font-bold text-green-100" style={font}>{totalSims}</p>
-            </div>
-            <div className="bg-gray-900/30 border border-blue-900/30 p-4 text-center">
-              <p className="text-xs text-blue-200/50 mb-1" style={font}>Blue (Defender) Wins</p>
-              <p className="text-3xl font-bold text-blue-400" style={font}>{blueWins}</p>
-            </div>
-            <div className="bg-gray-900/30 border border-red-900/30 p-4 text-center">
-              <p className="text-xs text-red-200/50 mb-1" style={font}>Red (Attacker) Wins</p>
-              <p className="text-3xl font-bold text-red-400" style={font}>{redWins}</p>
-            </div>
-            <div className={`bg-gray-900/30 border p-4 text-center ${winRate >= 50 ? 'border-green-600/50' : 'border-red-600/50'}`}>
-              <p className="text-xs text-green-200/50 mb-1" style={font}>Defense Success Rate</p>
-              <p className={`text-3xl font-bold ${winRate >= 50 ? 'text-green-400' : 'text-red-400'}`} style={font}>{winRate}%</p>
-            </div>
-          </div>
-
-          {/* Win rate bar */}
-          <div className="mb-2">
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-blue-400 text-xs font-bold" style={font}>BLUE (Defender) — {winRate}%</span>
-              <span className="text-red-400 text-xs font-bold" style={font}>RED (Attacker) — {(100 - winRate).toFixed(1)}%</span>
-            </div>
-            <div className="w-full h-5 bg-gray-900/50 border border-green-900/30 overflow-hidden flex">
-              <div className="bg-blue-600/80 h-full transition-all duration-500" style={{ width: `${winRate}%` }}></div>
-              <div className="bg-red-600/80 h-full transition-all duration-500" style={{ width: `${100 - winRate}%` }}></div>
-            </div>
-          </div>
-          <p className="text-[10px] text-green-200/30 mb-6" style={font}>
-            {winRate >= 70 ? 'Your network defenses are performing well — Blue agent consistently outperforms the attacker.' :
-             winRate >= 50 ? 'Defenses are holding, but there is room for improvement. Consider patching critical CVEs and re-running drills.' :
-             'Your network is vulnerable — the attacker wins more often. Prioritize patching critical vulnerabilities and hardening hosts.'}
-          </p>
-
-          {/* Simulation history — clickable */}
-          {sims.length > 0 && (
-            <div>
-              <p className="text-xs text-green-200/50 mb-2" style={font}>Drill History — click any to view its step-by-step breakdown above:</p>
-              <div className="space-y-2 max-h-48 overflow-y-auto">
-                {sims.slice(0, 10).map(s => {
-                  const blueWon = (s.total_blue_reward || 0) >= (s.total_red_reward || 0)
-                  return (
-                    <div key={s.id} onClick={() => loadSimDetail(s.id)}
-                      className={`flex items-center justify-between p-3 cursor-pointer border transition-all ${
-                        selectedSim?.id === s.id ? 'border-green-600 bg-green-900/20' : 'border-green-900/30 bg-gray-900/20 hover:border-green-800/50'
-                      }`}>
-                      <div className="flex items-center gap-3">
-                        <span className="text-green-100 text-sm" style={font}>Drill #{s.id}</span>
-                        <span className="text-green-200/30 text-xs" style={font}>{s.total_steps} steps</span>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <span className="text-red-400 text-xs" style={font}>Red: {s.total_red_reward?.toFixed(1)}</span>
-                        <span className="text-blue-400 text-xs" style={font}>Blue: {s.total_blue_reward?.toFixed(1)}</span>
-                        <span className={`text-xs px-2 py-0.5 border font-bold ${
-                          blueWon ? 'border-blue-700/50 text-blue-400 bg-blue-900/20' : 'border-red-700/50 text-red-400 bg-red-900/20'
-                        }`} style={font}>{blueWon ? 'DEFENDED' : 'BREACHED'}</span>
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
@@ -553,37 +596,6 @@ const Analytics = () => {
         </button>
       </div>
 
-      {/* CVE Table */}
-      {allCVEs.length > 0 && (
-        <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
-          <h2 className="text-xl font-bold text-green-100 mb-4" style={font}>
-            <FaExclamationTriangle className="inline mr-2 text-red-400" />CVE Inventory ({allCVEs.length})
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-900/40">
-                <tr>{['CVE', 'Name', 'Host', 'Severity', 'Service', 'Fix'].map(h => (
-                  <th key={h} className="px-4 py-2 text-left text-xs text-green-200 uppercase" style={font}>{h}</th>
-                ))}</tr>
-              </thead>
-              <tbody className="divide-y divide-green-900/30">
-                {allCVEs.map((c, i) => (
-                  <tr key={i} className="hover:bg-gray-900/30">
-                    <td className="px-4 py-2 text-green-100 font-mono text-xs">{c.cve}</td>
-                    <td className="px-4 py-2 text-green-200/70 text-xs" style={font}>{c.name}</td>
-                    <td className="px-4 py-2 text-green-100 text-xs" style={font}>{c.host}</td>
-                    <td className="px-4 py-2"><span className={`text-xs font-bold px-2 py-0.5 border ${
-                      c.severity === 'CRITICAL' ? 'border-red-600/50 text-red-400 bg-red-900/20' : 'border-yellow-600/50 text-yellow-400 bg-yellow-900/20'
-                    }`} style={font}>{c.severity}</span></td>
-                    <td className="px-4 py-2 text-green-200/70 text-xs" style={font}>{c.service}</td>
-                    <td className="px-4 py-2 text-green-200/50 text-xs" style={font}>{c.fix}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }

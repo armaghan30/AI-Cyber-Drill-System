@@ -1,6 +1,5 @@
 import json
 import datetime
-import copy
 
 from orchestrator.yaml_loader import YAMLLoader
 from orchestrator.env_builder import Environment
@@ -66,15 +65,18 @@ class Orchestrator:
                 "detected": host.detected,
                 "hardened_level": host.hardened_level,
                 "data_exfiltrated": host.data_exfiltrated,
+                "firewall_active": host.firewall_active,
             }
             for name, host in self.environment.hosts.items()
         }
 
+        fw = self.environment.firewall_engine
         return {
             "step": self.environment.step_count,
             "timestamp": datetime.datetime.now().isoformat(),
             "hosts": hosts_state,
-            "edges": copy.deepcopy(self.environment.edges),
+            "edges": list(self.environment.edges),
+            "firewall_status": fw.get_status() if fw else {},
         }
 
     # -------------------Encoding helpers---------------------------
@@ -138,6 +140,7 @@ class Orchestrator:
                 "detected": int(host.detected),
                 "hardened_level": host.hardened_level,
                 "data_exfiltrated": int(host.data_exfiltrated),
+                "firewall_active": int(host.firewall_active),
             }
 
         blue_state = {
@@ -234,7 +237,7 @@ class Orchestrator:
 
 
 if __name__ == "__main__":
-    topology_path = "orchestrator/sample_topology.yaml"
+    topology_path = "orchestrator/baselines/sample_topology.yaml"
 
     print("[MAIN] Starting orchestrator...")
     orch = Orchestrator(topology_path)

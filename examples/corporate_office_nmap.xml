@@ -1,0 +1,323 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE nmaprun>
+<nmaprun scanner="nmap" args="nmap -sV -O --script=vuln -oX corporate_office_nmap.xml 10.10.0.0/24" start="1747180800" startstr="Wed May 14 09:00:00 2025" version="7.94" xmloutputversion="1.05">
+
+<!-- ============================================================ -->
+<!--  Corporate Office Network Scan — 10.10.0.0/24               -->
+<!--  Scanned by: IT Security Team                                -->
+<!--  12 active hosts discovered                                  -->
+<!-- ============================================================ -->
+
+<!-- Firewall / Edge Router -->
+<host starttime="1747180800" endtime="1747180802">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.1" addrtype="ipv4"/>
+  <hostnames><hostname name="fw-edge-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="7.2p2" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="53">
+      <state state="open" reason="syn-ack"/>
+      <service name="dns" product="BIND" version="9.11.4"/>
+    </port>
+    <port protocol="tcp" portid="80">
+      <state state="open" reason="syn-ack"/>
+      <service name="http" product="nginx" version="1.14.0" extrainfo="management console"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 4.15 (Ubuntu 18.04)" accuracy="96">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="4.15"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Web Application Server -->
+<host starttime="1747180802" endtime="1747180806">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.10" addrtype="ipv4"/>
+  <hostnames><hostname name="web-app-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="7.4p1" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="80">
+      <state state="open" reason="syn-ack"/>
+      <service name="http" product="Apache httpd" version="2.4.49" extrainfo="(Unix)"/>
+    </port>
+    <port protocol="tcp" portid="443">
+      <state state="open" reason="syn-ack"/>
+      <service name="https" product="Apache httpd" version="2.4.49" extrainfo="OpenSSL/1.1.1k"/>
+    </port>
+    <port protocol="tcp" portid="8080">
+      <state state="open" reason="syn-ack"/>
+      <service name="http-proxy" product="Apache Tomcat" version="9.0.41" extrainfo="Spring Boot 2.5.3"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 4.15 (CentOS 7)" accuracy="96">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="4.15"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Mail Server -->
+<host starttime="1747180806" endtime="1747180810">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.11" addrtype="ipv4"/>
+  <hostnames><hostname name="mail-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="7.6p1" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="25">
+      <state state="open" reason="syn-ack"/>
+      <service name="smtp" product="Postfix smtpd" version="3.4.13"/>
+    </port>
+    <port protocol="tcp" portid="143">
+      <state state="open" reason="syn-ack"/>
+      <service name="imap" product="Dovecot imapd" version="2.3.7"/>
+    </port>
+    <port protocol="tcp" portid="443">
+      <state state="open" reason="syn-ack"/>
+      <service name="https" product="Roundcube Webmail" version="1.4.6"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 5.4 (Ubuntu 20.04)" accuracy="95">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.4"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Application Server -->
+<host starttime="1747180810" endtime="1747180814">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.20" addrtype="ipv4"/>
+  <hostnames><hostname name="app-srv-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="8.0p1" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="80">
+      <state state="open" reason="syn-ack"/>
+      <service name="http" product="nginx" version="1.18.0" extrainfo="reverse proxy"/>
+    </port>
+    <port protocol="tcp" portid="2375">
+      <state state="open" reason="syn-ack"/>
+      <service name="docker" product="Docker" version="20.10.7" extrainfo="API 1.41"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 5.15 (Ubuntu 22.04)" accuracy="97">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.15"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Windows Application Server -->
+<host starttime="1747180814" endtime="1747180818">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.21" addrtype="ipv4"/>
+  <hostnames><hostname name="app-win-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="80">
+      <state state="open" reason="syn-ack"/>
+      <service name="http" product="Microsoft IIS httpd" version="10.0"/>
+    </port>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows Server 2019 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows Server 2019" accuracy="97">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="2019"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Domain Controller -->
+<host starttime="1747180818" endtime="1747180823">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.30" addrtype="ipv4"/>
+  <hostnames><hostname name="dc-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="53">
+      <state state="open" reason="syn-ack"/>
+      <service name="dns" product="Microsoft DNS" version="6.1.7601"/>
+    </port>
+    <port protocol="tcp" portid="88">
+      <state state="open" reason="syn-ack"/>
+      <service name="kerberos-sec" product="Microsoft Windows Kerberos" version=""/>
+    </port>
+    <port protocol="tcp" portid="389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ldap" product="Microsoft Windows Active Directory LDAP" version="Domain: office.local"/>
+    </port>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows Server 2019 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows Server 2019" accuracy="98">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="2019"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- File Server -->
+<host starttime="1747180823" endtime="1747180826">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.31" addrtype="ipv4"/>
+  <hostnames><hostname name="file-srv-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows Server 2016 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows Server 2016" accuracy="96">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="2016"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Primary Database Server -->
+<host starttime="1747180826" endtime="1747180830">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.40" addrtype="ipv4"/>
+  <hostnames><hostname name="db-primary-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="7.9p1" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="3306">
+      <state state="open" reason="syn-ack"/>
+      <service name="mysql" product="MySQL" version="5.7.34" extrainfo="protocol 10"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 5.4 (Ubuntu 20.04)" accuracy="96">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.4"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Secondary / Backup Database -->
+<host starttime="1747180830" endtime="1747180834">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.41" addrtype="ipv4"/>
+  <hostnames><hostname name="db-backup-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH" version="8.0p1" extrainfo="protocol 2.0"/>
+    </port>
+    <port protocol="tcp" portid="5432">
+      <state state="open" reason="syn-ack"/>
+      <service name="postgresql" product="PostgreSQL" version="13.4" extrainfo="(Debian)"/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Linux 5.10 (Debian 11)" accuracy="95">
+      <osclass type="general purpose" vendor="Linux" osfamily="Linux" osgen="5.10"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- HR Workstation -->
+<host starttime="1747180834" endtime="1747180837">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.50" addrtype="ipv4"/>
+  <hostnames><hostname name="ws-hr-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows 10 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows 10 21H2" accuracy="95">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="10"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Finance Workstation -->
+<host starttime="1747180837" endtime="1747180840">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.51" addrtype="ipv4"/>
+  <hostnames><hostname name="ws-finance-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows 10 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows 10 1909" accuracy="94">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="10"/>
+    </osmatch>
+  </os>
+</host>
+
+<!-- Developer Workstation -->
+<host starttime="1747180840" endtime="1747180843">
+  <status state="up" reason="echo-reply"/>
+  <address addr="10.10.0.52" addrtype="ipv4"/>
+  <hostnames><hostname name="ws-dev-01.office.local" type="PTR"/></hostnames>
+  <ports>
+    <port protocol="tcp" portid="22">
+      <state state="open" reason="syn-ack"/>
+      <service name="ssh" product="OpenSSH for Windows" version="8.1"/>
+    </port>
+    <port protocol="tcp" portid="445">
+      <state state="open" reason="syn-ack"/>
+      <service name="microsoft-ds" product="Windows 10 microsoft-ds" version=""/>
+    </port>
+    <port protocol="tcp" portid="3389">
+      <state state="open" reason="syn-ack"/>
+      <service name="ms-wbt-server" product="Microsoft Terminal Services" version=""/>
+    </port>
+  </ports>
+  <os>
+    <osmatch name="Microsoft Windows 10 21H2" accuracy="95">
+      <osclass type="general purpose" vendor="Microsoft" osfamily="Windows" osgen="10"/>
+    </osmatch>
+  </os>
+</host>
+
+<runstats>
+  <finished time="1747180843" timestr="Wed May 14 09:07:23 2025" elapsed="443.21" summary="Nmap done at Wed May 14 09:07:23 2025; 12 IP addresses (12 hosts up) scanned in 443.21 seconds"/>
+  <hosts up="12" down="242" total="256"/>
+</runstats>
+</nmaprun>

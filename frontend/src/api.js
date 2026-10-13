@@ -5,10 +5,6 @@ function getToken() {
   return localStorage.getItem('token') || '';
 }
 
-// ── Per-user data scoping ───────────────────────────────────────────────
-// The backend has a single shared DB. We track which scenario IDs belong
-// to the current user in localStorage so each user sees only their data.
-
 function _userKey() {
   const u = localStorage.getItem('username');
   return u ? `cyberDrill_scenarios_${u}` : null;
@@ -87,8 +83,12 @@ const api = {
     }
     return res.json();
   },
+  deleteScenario: (id) =>
+    apiFetch(`/scenarios/${id}`, { method: 'DELETE' }).catch(() => true),
+  getTrainingStatus: (scenarioId) =>
+    apiFetch(`/scenarios/${scenarioId}/training-status`),
 
-  // Simulations
+  // Simulations — full run
   runSimulation: (scenarioId, maxSteps = 10) =>
     apiFetch('/simulations/run', {
       method: 'POST',
@@ -96,12 +96,56 @@ const api = {
     }),
   listSimulations: () => apiFetch('/simulations'),
   getSimulation: (id) => apiFetch(`/simulations/${id}`),
+  getAttackPath: (simId) => apiFetch(`/simulations/${simId}/attack-path`),
+
+  // Simulations — live step-by-step
+  createSimulation: (scenarioId, maxSteps = 50) =>
+    apiFetch('/simulations/', {
+      method: 'POST',
+      body: JSON.stringify({ scenario_id: scenarioId, max_steps: maxSteps }),
+    }),
+  runStep: (sessionId) => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), 45000);
+    const token = getToken();
+    const headers = { 'Content-Type': 'application/json' };
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    return fetch(`${API_BASE}/simulations/${sessionId}/step`, {
+      method: 'POST',
+      headers,
+      signal: controller.signal,
+    })
+      .then(res => {
+        clearTimeout(timer);
+        if (!res.ok) return res.json().catch(() => ({ detail: res.statusText })).then(e => { throw new Error(e.detail || 'Step failed'); });
+        return res.json();
+      })
+      .catch(err => {
+        clearTimeout(timer);
+        if (err.name === 'AbortError') throw new Error('Step timed out — backend is busy. Try closing other browser tabs.');
+        throw err;
+      });
+  },
+  stopSimulation: (sessionId) =>
+    apiFetch(`/simulations/${sessionId}/stop`, { method: 'POST' }),
+
+  // Posture comparison
+  postureComparison: (scenarioId, trials = 10, maxSteps = 15) =>
+    apiFetch(`/simulations/posture-comparison?scenario_id=${scenarioId}&trials=${trials}&max_steps=${maxSteps}`, {
+      method: 'POST',
+    }),
 
   // Training
   startTraining: (payload) =>
     apiFetch('/training', { method: 'POST', body: JSON.stringify(payload) }),
   listTrainingRuns: () => apiFetch('/training'),
   getTrainingRun: (id) => apiFetch(`/training/${id}`),
+  pauseTraining: (runId) =>
+    apiFetch(`/training/${runId}/pause`, { method: 'POST' }),
+  resumeTraining: (runId) =>
+    apiFetch(`/training/${runId}/resume`, { method: 'POST' }),
+  stopTraining: (runId) =>
+    apiFetch(`/training/${runId}/stop`, { method: 'POST' }),
 
   // Reports
   dashboard: () => apiFetch('/reports/dashboard'),
@@ -111,38 +155,62 @@ const api = {
   simulationSummary: (id) => apiFetch(`/reports/simulations/${id}/summary`),
   defenseAnalysis: () => apiFetch('/reports/defense-analysis'),
   simulationReport: (id) => apiFetch(`/reports/simulations/${id}/report`),
+  firewallAnalysis: (simId) => apiFetch(`/reports/simulations/${simId}/firewall`),
+  aiRecommendations: (scenarioId) =>
+    apiFetch(`/reports/scenarios/${scenarioId}/recommendations`),
+  downloadPdf: async (scenarioId, simId) => {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const url = `${API_BASE}/reports/scenarios/${scenarioId}/pdf${simId ? `?sim_id=${simId}` : ''}`;
+    const res = await fetch(url, { headers });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'PDF generation failed');
+    }
+    return res.blob();
+  },
 
-  // Delete
-  deleteScenario: (id) =>
-    apiFetch(`/scenarios/${id}`, { method: 'DELETE' }).catch(() => true),
-
-  // ── Per-user scoped helpers ──────────────────────────────────────────
-  // These filter backend data to only what the current user uploaded.
-
+  // Per-user scoped helpers (kept for backwards compat)
   addUserScenario: (id) => addUserScenario(id),
   removeUserScenario: (id) => removeUserScenario(id),
   getUserScenarioIds: () => getUserScenarioIds(),
+  listMyScenarios: () => apiFetch('/scenarios'),
+  listMySimulations: () => apiFetch('/simulations'),
+  listMyTrainingRuns: () => apiFetch('/training'),
 
-  /** List only scenarios that belong to the current user */
-  listMyScenarios: async () => {
-    const all = await apiFetch('/scenarios');
-    const myIds = getUserScenarioIds();
-    return all.filter(s => myIds.includes(s.id));
+  // Nmap import
+  parseNmap: async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = `Bearer ${token}`;
+    const res = await fetch(`${API_BASE}/topology/parse-nmap`, {
+      method: 'POST',
+      headers,
+      body: formData,
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({ detail: res.statusText }));
+      throw new Error(err.detail || 'Parse failed');
+    }
+    return res.json();
   },
 
-  /** List only simulations for the current user's scenarios */
-  listMySimulations: async () => {
-    const all = await apiFetch('/simulations');
-    const myIds = getUserScenarioIds();
-    return all.filter(s => myIds.includes(s.scenario_id));
-  },
+  saveNmap: (filename, hosts, sensitivities, edges = []) =>
+    apiFetch('/topology/save-nmap', {
+      method: 'POST',
+      body: JSON.stringify({ filename, hosts, sensitivities, edges }),
+    }),
 
-  /** List only training runs for the current user's scenarios */
-  listMyTrainingRuns: async () => {
-    const all = await apiFetch('/training');
-    const myIds = getUserScenarioIds();
-    return all.filter(r => myIds.includes(r.scenario_id));
-  },
+  // CVE lookup — single or batch
+  getCVE: (cveId) => apiFetch(`/cve/${encodeURIComponent(cveId)}`),
+  getCVEBatch: (cveIds) =>
+    apiFetch('/cve/batch', {
+      method: 'POST',
+      body: JSON.stringify({ ids: cveIds }),
+    }),
 
   // Static URLs
   plotUrl: (filename) => `${STATIC_BASE}/plots/${filename}.png`,

@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -12,13 +12,26 @@ import AIOrchestrator from './pages/AIOrchestrator'
 import Settings from './pages/Settings'
 import Profile from './pages/Profile'
 import Analytics from './pages/Analytics'
-import TrainingResults from './pages/TrainingResults'
 import Report from './pages/Report'
+import api from './api'
 
 function App() {
   const [isAuthenticated, setIsAuthenticated] = useState(
     () => !!localStorage.getItem('token')
   )
+
+  // Validate the cached token against the backend on every app load. If the
+  // backend was reset (DB wiped before the demo) or the user was deleted, the
+  // stale token in localStorage would otherwise keep showing the home page.
+  // Failing this check sends the user back to the login screen.
+  useEffect(() => {
+    if (!localStorage.getItem('token')) return
+    api.me().catch(() => {
+      localStorage.removeItem('token')
+      localStorage.removeItem('username')
+      setIsAuthenticated(false)
+    })
+  }, [])
 
   const handleLogout = () => {
     localStorage.removeItem('token')
@@ -65,7 +78,6 @@ function App() {
           <Route path="defense-analyser" element={<Navigate to="/analytics" replace />} />
           <Route path="analytics" element={<Analytics />} />
           <Route path="report" element={<Report />} />
-          <Route path="training-results" element={<TrainingResults />} />
           <Route path="settings" element={<Settings />} />
           <Route path="profile" element={<Profile />} />
         </Route>

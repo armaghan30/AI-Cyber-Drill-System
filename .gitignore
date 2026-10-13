@@ -1,46 +1,56 @@
-# Virtual environments
+# --- Virtual environments ---
 cyber_env/
 env/
 venv/
 .venv/
 
-# Python cache
+# --- Python cache / compiled ---
 __pycache__/
 *.pyc
 *.pyo
 
-# Editor / OS
+# --- Flask / web sessions ---
+flask_session/
+
+# --- Editor / OS ---
 .vscode/
 .DS_Store
 Thumbs.db
 
-# Logs
+# --- Logs / temp ---
 *.log
 
-# Model files (too large for git)
-results/models/
+# --- Model files ---
+# trained MaskablePPO models in results/models/ are committed (small, needed to run drills)
 *.pth
-*.zip
 
-# TensorBoard logs
-tb_logs/
-
-# Pip artifacts
+# --- Pip artifacts ---
 =*
 
-# Pytest cache
+# --- Pytest cache ---
 .pytest_cache/
 
-# Local experiment files
+# --- Optional: local-only experiment logs/models ---
 models_local/
 results_local/
 
-# SQLite database
+# --- SQLite database ---
 *.db
 
-# Simulation output
+# --- Per-user uploaded topologies (runtime data, not source) ---
+user_uploads/
+
+# --- Simulation output ---
 simulation_log.json
 
-# Frontend build
+# --- Frontend build ---
 frontend/node_modules/
 frontend/dist/
+
+# --- Screen recordings (demo video is linked from the README instead) ---
+*.mp4
+
+# Local backups (not tracked on remote)
+orchestrator_backup_before_merge_*/
+results/csv/old_apr27_backup/
+

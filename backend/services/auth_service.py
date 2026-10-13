@@ -4,9 +4,10 @@ import json
 import base64
 import time
 from sqlalchemy.orm import Session
+from backend.config import settings
 from backend.models.user import User
 
-SECRET = "cyberdrill-secret-key-change-in-production"
+SECRET = settings.SECRET_KEY
 
 
 def _make_token(user_id, username):

@@ -15,6 +15,8 @@ class Simulation(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     scenario_id = Column(Integer, ForeignKey("scenarios.id"), nullable=False)
+    # Owning user — null for legacy rows. Listing endpoints filter on this.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     session_id = Column(String(36), unique=True, nullable=False, index=True)
     status = Column(Enum(SimulationStatus), default=SimulationStatus.RUNNING)
     max_steps = Column(Integer, default=10)

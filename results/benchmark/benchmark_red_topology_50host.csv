@@ -1,0 +1,10 @@
+topology,role,algorithm,seed,timesteps,eval_episodes,mean_return,mean_hosts_compromised,mean_hosts_exfiltrated,invalid_action_rate,train_seconds
+topology_50host,red,dqn,0,50000,50,-10.74,0.98,0.0,0.563,1157.6
+topology_50host,red,dqn,1,50000,50,83.54,0.92,0.0,0.0,1221.1
+topology_50host,red,dqn,2,50000,50,46.64,0.0,0.0,0.0,967.8
+topology_50host,red,ppo,0,50000,50,-68.94,1.0,0.0,0.941,657.7
+topology_50host,red,ppo,1,50000,50,-69.16,0.98,0.0,0.941,791.3
+topology_50host,red,ppo,2,50000,50,-71.52,0.96,0.0,0.941,660.7
+topology_50host,red,maskable_ppo,0,50000,50,501.44,12.82,0.0,0.0,715.0
+topology_50host,red,maskable_ppo,1,50000,50,509.16,13.02,0.0,0.0,645.9
+topology_50host,red,maskable_ppo,2,50000,50,501.04,12.9,0.0,0.0,732.7

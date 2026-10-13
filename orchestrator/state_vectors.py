@@ -53,6 +53,7 @@ def flatten_blue_state(blue_state: Dict, host_order: List[str]) -> np.ndarray:
                 float(h.get("detected", 0)),
                 float(h.get("hardened_level", 0)),
                 float(h.get("data_exfiltrated", 0)),
+                float(h.get("firewall_active", 0)),
             ]
         )
 

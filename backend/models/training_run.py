@@ -15,6 +15,8 @@ class TrainingRun(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     scenario_id = Column(Integer, ForeignKey("scenarios.id"), nullable=False)
+    # Owning user — null for legacy rows. Listing endpoints filter on this.
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     agent_role = Column(String(10), nullable=False)  # red / blue
     algorithm = Column(String(20), nullable=False)  # dqn / ppo
     status = Column(Enum(TrainingStatus), default=TrainingStatus.QUEUED)

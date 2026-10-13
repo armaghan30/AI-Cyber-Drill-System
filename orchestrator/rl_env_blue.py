@@ -32,7 +32,7 @@ class BlueRLEnvironment(gym.Env):
         example_vec = flatten_blue_state(blue_state, self.host_order)
         self.state_dim = int(example_vec.shape[0])
 
-        self.action_dim = 5 * len(self.host_order) + 1
+        self.action_dim = 6 * len(self.host_order) + 1
 
         self.observation_space = spaces.Box(
             low=0.0, high=100.0, shape=(self.state_dim,), dtype=np.float32
@@ -76,6 +76,9 @@ class BlueRLEnvironment(gym.Env):
         elif index < 5 * n:
             host = self.host_order[index - 4 * n]
             return {"action": "harden", "target": host}
+        elif index < 6 * n:
+            host = self.host_order[index - 5 * n]
+            return {"action": "deploy_firewall", "target": host}
         else:
             return {"action": "idle", "target": None}
 
@@ -122,6 +125,28 @@ class BlueRLEnvironment(gym.Env):
         }
 
         return np.array(obs_vec, dtype=np.float32), float(blue_reward), terminated, truncated, info
+
+    # ------------------------------------------------------------
+    def action_masks(self) -> np.ndarray:
+        n = len(self.host_order)
+        mask = np.ones(self.action_dim, dtype=bool)
+
+        for i, hname in enumerate(self.host_order):
+            host = self.environment.hosts[hname]
+            iso = host.is_isolated
+
+            # isolate: skip if already isolated
+            if iso:
+                mask[n + i] = False
+            # restore: only if isolated
+            if not iso:
+                mask[2 * n + i] = False
+            # deploy_firewall: skip if already active
+            if getattr(host, "firewall_active", False):
+                mask[5 * n + i] = False
+
+        # idle is always valid (last slot)
+        return mask
 
     # ------------------------------------------------------------
     def render(self):

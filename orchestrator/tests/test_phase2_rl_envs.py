@@ -5,43 +5,43 @@ from orchestrator.rl_env_blue import BlueRLEnvironment
 
 
 def test_red_rl_dims_2host():
-    env = RedRLEnvironment("orchestrator/sample_topology.yaml", max_steps=5)
+    env = RedRLEnvironment("orchestrator/baselines/sample_topology.yaml", max_steps=5)
     assert env.action_dim == 11    # 5*2 + 1
     assert env.state_dim == 21     # 3 + 9*2
 
 
 def test_blue_rl_dims_2host():
-    env = BlueRLEnvironment("orchestrator/sample_topology.yaml", max_steps=5)
-    assert env.action_dim == 11    # 5*2 + 1
-    assert env.state_dim == 18     # 2 + 8*2
+    env = BlueRLEnvironment("orchestrator/baselines/sample_topology.yaml", max_steps=5)
+    assert env.action_dim == 13    # 6*2 + 1 (includes deploy_firewall)
+    assert env.state_dim == 20     # 2 + 9*2 (includes firewall flag)
 
 
 def test_red_rl_dims_4host():
-    env = RedRLEnvironment("orchestrator/topology_4host.yaml", max_steps=5)
+    env = RedRLEnvironment("orchestrator/baselines/topology_4host.yaml", max_steps=5)
     assert env.action_dim == 21    # 5*4 + 1
     assert env.state_dim == 39     # 3 + 9*4
 
 
 def test_blue_rl_dims_4host():
-    env = BlueRLEnvironment("orchestrator/topology_4host.yaml", max_steps=5)
-    assert env.action_dim == 21    # 5*4 + 1
-    assert env.state_dim == 34     # 2 + 8*4
+    env = BlueRLEnvironment("orchestrator/baselines/topology_4host.yaml", max_steps=5)
+    assert env.action_dim == 25    # 6*4 + 1 (includes deploy_firewall)
+    assert env.state_dim == 38     # 2 + 9*4 (includes firewall flag)
 
 
 def test_red_rl_dims_8host():
-    env = RedRLEnvironment("orchestrator/topology_8host.yaml", max_steps=5)
+    env = RedRLEnvironment("orchestrator/baselines/topology_8host.yaml", max_steps=5)
     assert env.action_dim == 41    # 5*8 + 1
     assert env.state_dim == 75     # 3 + 9*8
 
 
 def test_blue_rl_dims_8host():
-    env = BlueRLEnvironment("orchestrator/topology_8host.yaml", max_steps=5)
-    assert env.action_dim == 41    # 5*8 + 1
-    assert env.state_dim == 66     # 2 + 8*8
+    env = BlueRLEnvironment("orchestrator/baselines/topology_8host.yaml", max_steps=5)
+    assert env.action_dim == 49    # 6*8 + 1 (includes deploy_firewall)
+    assert env.state_dim == 74     # 2 + 9*8 (includes firewall flag)
 
 
 def test_red_decode_all_actions_2host():
-    env = RedRLEnvironment("orchestrator/sample_topology.yaml", max_steps=5)
+    env = RedRLEnvironment("orchestrator/baselines/sample_topology.yaml", max_steps=5)
     actions = []
     for i in range(env.action_dim):
         a = env._decode_red_action(i)
@@ -61,7 +61,7 @@ def test_red_decode_all_actions_2host():
 
 
 def test_blue_decode_all_actions_2host():
-    env = BlueRLEnvironment("orchestrator/sample_topology.yaml", max_steps=5)
+    env = BlueRLEnvironment("orchestrator/baselines/sample_topology.yaml", max_steps=5)
     actions = []
     for i in range(env.action_dim):
         a = env._decode_blue_action(i)
@@ -77,11 +77,13 @@ def test_blue_decode_all_actions_2host():
     assert actions[7] == "detect"
     assert actions[8] == "harden"
     assert actions[9] == "harden"
-    assert actions[10] == "idle"
+    assert actions[10] == "deploy_firewall"
+    assert actions[11] == "deploy_firewall"
+    assert actions[12] == "idle"
 
 
 def test_red_full_episode_2host():
-    env = RedRLEnvironment("orchestrator/sample_topology.yaml", max_steps=10)
+    env = RedRLEnvironment("orchestrator/baselines/sample_topology.yaml", max_steps=10)
     obs, _ = env.reset()
     for _ in range(10):
         action = env.action_space.sample()
@@ -92,7 +94,7 @@ def test_red_full_episode_2host():
 
 
 def test_red_full_episode_4host():
-    env = RedRLEnvironment("orchestrator/topology_4host.yaml", max_steps=10)
+    env = RedRLEnvironment("orchestrator/baselines/topology_4host.yaml", max_steps=10)
     obs, _ = env.reset()
     for _ in range(10):
         action = env.action_space.sample()
@@ -103,7 +105,7 @@ def test_red_full_episode_4host():
 
 
 def test_red_full_episode_8host():
-    env = RedRLEnvironment("orchestrator/topology_8host.yaml", max_steps=10)
+    env = RedRLEnvironment("orchestrator/baselines/topology_8host.yaml", max_steps=10)
     obs, _ = env.reset()
     for _ in range(10):
         action = env.action_space.sample()

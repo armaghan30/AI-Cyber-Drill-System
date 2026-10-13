@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import {
   FaShieldAlt, FaExclamationTriangle, FaBug, FaNetworkWired,
   FaServer, FaLock, FaFileDownload, FaArrowLeft, FaBrain,
-  FaCheckCircle, FaTimesCircle, FaInfoCircle, FaFireAlt,
+  FaCheckCircle, FaTimesCircle, FaInfoCircle,
   FaWrench, FaChartLine
 } from 'react-icons/fa'
 import api from '../api'
@@ -26,14 +26,40 @@ const COUNTER_MAP = {
 }
 
 const CVE_DATABASE = {
-  'CVE-2021-44228': { name: 'Log4Shell', severity: 'CRITICAL', desc: 'Remote code execution in Apache Log4j 2.x', fix: 'Upgrade Log4j to 2.17.1+. Set log4j2.formatMsgNoLookups=true as interim mitigation.' },
-  'CVE-2021-34527': { name: 'PrintNightmare', severity: 'CRITICAL', desc: 'Windows Print Spooler remote code execution', fix: 'Disable Print Spooler service on non-print servers. Apply KB5005010 patch.' },
-  'CVE-2023-0286': { name: 'OpenSSL X.509 Type Confusion', severity: 'HIGH', desc: 'X.509 certificate verification vulnerability', fix: 'Upgrade OpenSSL to 3.0.8+ or 1.1.1t+.' },
-  'CVE-2022-22965': { name: 'Spring4Shell', severity: 'CRITICAL', desc: 'Spring Framework RCE via data binding', fix: 'Upgrade Spring Framework to 5.3.18+ or 5.2.20+.' },
-  'CVE-2023-23397': { name: 'Outlook Elevation', severity: 'CRITICAL', desc: 'Microsoft Outlook elevation of privilege', fix: 'Apply Microsoft security update. Block TCP 445 outbound at firewall.' },
-  'CVE-2022-30190': { name: 'Follina', severity: 'HIGH', desc: 'Microsoft MSDT remote code execution', fix: 'Disable MSDT URL protocol. Apply Microsoft security update.' },
-  'CVE-2021-26855': { name: 'ProxyLogon', severity: 'CRITICAL', desc: 'Microsoft Exchange Server SSRF', fix: 'Apply Exchange cumulative updates. Restrict external access to ECP/OWA.' },
-  'CVE-2020-1472': { name: 'Zerologon', severity: 'CRITICAL', desc: 'Netlogon elevation of privilege', fix: 'Apply August 2020 security update. Enable Domain Controller enforcement mode.' },
+  // Windows / Microsoft
+  'CVE-2021-34527': { name: 'PrintNightmare',           severity: 'CRITICAL', desc: 'Windows Print Spooler remote code execution',              fix: 'Disable Print Spooler on non-print servers. Apply KB5004945.' },
+  'CVE-2021-1675':  { name: 'PrintNightmare v2',        severity: 'HIGH',     desc: 'Windows Print Spooler LPE variant',                        fix: 'Disable Print Spooler on non-print servers.' },
+  'CVE-2020-0796':  { name: 'SMBGhost',                 severity: 'CRITICAL', desc: 'Windows SMBv3 Client/Server RCE',                          fix: 'Apply KB4551762 or disable SMBv3 compression.' },
+  'CVE-2017-0144':  { name: 'EternalBlue',              severity: 'CRITICAL', desc: 'Windows SMBv1 remote code execution',                       fix: 'Apply MS17-010 and disable SMBv1.' },
+  'CVE-2020-1472':  { name: 'Zerologon',                severity: 'CRITICAL', desc: 'Netlogon elevation of privilege — unauthenticated DC takeover', fix: 'Apply August 2020 security update. Enable DC enforcement mode.' },
+  'CVE-2019-0708':  { name: 'BlueKeep',                 severity: 'CRITICAL', desc: 'Remote Desktop Services pre-auth RCE',                     fix: 'Apply KB4499175 or enable NLA.' },
+  'CVE-2021-26855': { name: 'ProxyLogon',               severity: 'CRITICAL', desc: 'Microsoft Exchange Server SSRF leading to RCE',             fix: 'Apply Exchange cumulative updates. Restrict ECP/OWA access.' },
+  'CVE-2021-26857': { name: 'Exchange Deserialization', severity: 'HIGH',     desc: 'Microsoft Exchange insecure deserialization allowing SYSTEM', fix: 'Apply Microsoft Exchange security updates (March 2021).' },
+  'CVE-2021-34535': { name: 'RDP Client RCE',           severity: 'CRITICAL', desc: 'Remote Desktop client remote code execution',               fix: 'Apply KB5004237 and restrict RDP client exposure.' },
+  'CVE-2022-21990': { name: 'RDP Client RCE v2',        severity: 'HIGH',     desc: 'Remote Desktop client RCE via crafted server',              fix: 'Apply February 2022 Patch Tuesday updates.' },
+  'CVE-2022-26923': { name: 'AD CS Priv Esc',           severity: 'CRITICAL', desc: 'Active Directory Certificate Services privilege escalation', fix: 'Apply KB5014754 and audit AD CS templates.' },
+  'CVE-2023-23397': { name: 'Outlook Elevation',        severity: 'CRITICAL', desc: 'Microsoft Outlook elevation of privilege via UNC path',      fix: 'Apply Microsoft security update. Block TCP 445 outbound.' },
+  'CVE-2022-30190': { name: 'Follina',                  severity: 'HIGH',     desc: 'Microsoft MSDT remote code execution via Office documents',  fix: 'Disable MSDT URL protocol. Apply Microsoft security update.' },
+  // Linux
+  'CVE-2022-0847':  { name: 'DirtyPipe',                severity: 'HIGH',     desc: 'Linux kernel pipe privilege escalation',                    fix: 'Update kernel to 5.16.11+.' },
+  'CVE-2021-3156':  { name: 'Baron Samedit',            severity: 'HIGH',     desc: 'Heap-based buffer overflow in sudo',                        fix: 'Update sudo to 1.9.5p2+.' },
+  'CVE-2016-5195':  { name: 'DirtyCow',                 severity: 'HIGH',     desc: 'Linux kernel race condition privilege escalation',           fix: 'Update kernel to 4.8.3+.' },
+  'CVE-2021-4034':  { name: 'PwnKit',                   severity: 'HIGH',     desc: 'polkit pkexec local privilege escalation',                  fix: 'Update polkit to 0.120+.' },
+  'CVE-2022-2588':  { name: 'DirtyCred',                severity: 'HIGH',     desc: 'Linux kernel credential swapping privilege escalation',      fix: 'Update kernel to latest stable.' },
+  'CVE-2023-0386':  { name: 'OverlayFS Priv Esc',       severity: 'HIGH',     desc: 'Linux overlayfs privilege escalation',                      fix: 'Update kernel to 6.2+.' },
+  'CVE-2021-3493':  { name: 'OverlayFS Ubuntu',         severity: 'HIGH',     desc: 'Ubuntu-specific overlayfs privilege escalation',            fix: 'Update Ubuntu kernel packages.' },
+  // Web / App servers
+  'CVE-2021-44228': { name: 'Log4Shell',                severity: 'CRITICAL', desc: 'Remote code execution in Apache Log4j 2.x via JNDI lookup',  fix: 'Upgrade Log4j to 2.17.1+. Set log4j2.formatMsgNoLookups=true.' },
+  'CVE-2022-22965': { name: 'Spring4Shell',             severity: 'CRITICAL', desc: 'Spring Framework RCE via data binding on JDK 9+',            fix: 'Upgrade Spring Framework to 5.3.18+ or 5.2.20+.' },
+  'CVE-2023-44487': { name: 'HTTP/2 Rapid Reset',       severity: 'CRITICAL', desc: 'HTTP/2 protocol DDoS via rapid stream resets',              fix: 'Update web server to patched version.' },
+  'CVE-2021-41773': { name: 'Apache Path Traversal',    severity: 'CRITICAL', desc: 'Apache httpd path traversal and RCE',                       fix: 'Update Apache to 2.4.50+.' },
+  'CVE-2019-0211':  { name: 'Apache Priv Esc',          severity: 'HIGH',     desc: 'Apache httpd local privilege escalation',                   fix: 'Update Apache to 2.4.39+.' },
+  'CVE-2023-0286':  { name: 'OpenSSL X.509 Confusion',  severity: 'HIGH',     desc: 'X.509 GeneralName type confusion in OpenSSL',               fix: 'Upgrade OpenSSL to 3.0.8+ or 1.1.1t+.' },
+  // Database
+  'CVE-2023-21912': { name: 'MySQL Server DoS',         severity: 'HIGH',     desc: 'MySQL Server denial of service vulnerability',              fix: 'Apply Oracle Critical Patch Update.' },
+  'CVE-2022-21270': { name: 'MySQL Server Exploit',     severity: 'MEDIUM',   desc: 'MySQL Server exploitable vulnerability',                    fix: 'Apply Oracle Jan 2022 CPU.' },
+  'CVE-2020-14812': { name: 'MySQL Server DoS v2',      severity: 'MEDIUM',   desc: 'MySQL Server denial of service',                            fix: 'Update MySQL to 8.0.22+.' },
+  'CVE-2019-2737':  { name: 'MySQL Server XML Vuln',    severity: 'MEDIUM',   desc: 'MySQL Server XML vulnerability',                            fix: 'Update MySQL to 5.7.27+.' },
 }
 
 const Report = () => {
@@ -43,15 +69,31 @@ const Report = () => {
   const [topoData, setTopoData] = useState(null)
   const [simulations, setSimulations] = useState([])
   const [latestSim, setLatestSim] = useState(null)
+  const [attackPath, setAttackPath] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [cveExtras, setCveExtras] = useState({}) // NVD-fetched data for CVEs not in local dict
 
+  useEffect(() => { loadData() }, [])
+
+  // Batch-fetch CVE data from NVD for any CVE not in the local dictionary
   useEffect(() => {
-    loadData()
-  }, [])
+    if (!topoData) return
+    const allIds = Object.values(topoData?.network?.hosts || {}).flatMap(h => h.vulnerabilities || [])
+    const unknown = [...new Set(allIds)].filter(id => !CVE_DATABASE[id])
+    if (unknown.length === 0) return
+    api.getCVEBatch(unknown)
+      .then(data => setCveExtras(prev => ({ ...prev, ...data })))
+      .catch(() => {})
+  }, [topoData])
+
+  // Merged CVE lookup — local dict first, NVD cache second, fallback third
+  const cveInfo = (id) =>
+    CVE_DATABASE[id] || (cveExtras[id] ? { ...cveExtras[id], desc: cveExtras[id].description } : null) ||
+    { name: id, severity: 'MEDIUM', desc: 'Known vulnerability', fix: 'Apply vendor security patch' }
 
   const loadData = async () => {
     try {
-      const scList = await api.listMyScenarios()
+      const scList = await api.listScenarios()
       setScenarios(scList)
       if (scList.length > 0) {
         await selectScenario(scList[0])
@@ -71,17 +113,19 @@ const Report = () => {
       setTopoData(topo)
     } catch { setTopoData(null) }
     try {
-      const sims = await api.listMySimulations()
+      const sims = await api.listSimulations()
       const scenarioSims = sims.filter(s => s.scenario_id === sc.id)
       setSimulations(scenarioSims)
       if (scenarioSims.length > 0) {
-        const latest = scenarioSims[scenarioSims.length - 1]
+        // listSimulations returns ordered by created_at DESC, so [0] is the newest
+        const latest = scenarioSims[0]
         try {
           const full = await api.getSimulation(latest.id)
           setLatestSim(full)
+          try { setAttackPath(await api.getAttackPath(latest.id)) } catch {}
         } catch { setLatestSim(latest) }
       } else {
-        setLatestSim(null)
+        setLatestSim(null); setAttackPath(null)
       }
     } catch { setSimulations([]); setLatestSim(null) }
   }
@@ -104,7 +148,7 @@ const Report = () => {
 
   const allCVEs = hosts.flatMap(h =>
     h.vulnerabilities.map(c => ({
-      ...(CVE_DATABASE[c] || { name: c, severity: 'HIGH', desc: 'Known vulnerability', fix: 'Apply vendor security patch' }),
+      ...cveInfo(c),
       id: c,
       host: h.name,
       os: h.os,
@@ -118,7 +162,7 @@ const Report = () => {
   const getHostRisk = (h) => {
     let risk = 0
     h.vulnerabilities.forEach(c => {
-      const info = CVE_DATABASE[c]
+      const info = cveInfo(c)
       risk += info?.severity === 'CRITICAL' ? 40 : info?.severity === 'HIGH' ? 25 : 15
     })
     if (h.sensitivity === 'high') risk += 20
@@ -127,8 +171,11 @@ const Report = () => {
   }
 
   const simSteps = latestSim?.steps || latestSim?.result?.steps || []
-  const totalRedReward = simSteps.reduce((s, st) => s + (st.red_reward || 0), 0)
-  const totalBlueReward = simSteps.reduce((s, st) => s + (st.blue_reward || 0), 0)
+  // Use the simulation's authoritative totals when available — summing simSteps
+  // breaks when the steps array is empty or truncated, which is why the on-page
+  // card was showing 0/0 even though the sim had real rewards.
+  const totalRedReward  = (latestSim?.total_red_reward  ?? simSteps.reduce((s, st) => s + (st.red_reward  || 0), 0))
+  const totalBlueReward = (latestSim?.total_blue_reward ?? simSteps.reduce((s, st) => s + (st.blue_reward || 0), 0))
   const blueWon = totalBlueReward >= totalRedReward
 
   const generatePrintableReport = () => {
@@ -233,8 +280,51 @@ const Report = () => {
       </tr>`
     }).join('')
 
+    // Attack path for PDF
+    const ap = attackPath
+    const attackPathSection = ap && ap.entry_point ? `
+<h3>3.2 Red Agent Attack Path</h3>
+<p>The following shows the complete pathway the Red agent took through the network during this simulation.</p>
+
+<table style="margin-bottom:12px">
+  <tr><th>Route</th><td style="font-weight:700;font-family:monospace">${ap.path_string}</td></tr>
+  <tr><th>Entry Point</th><td>${ap.entry_point}</td></tr>
+  <tr><th>Hosts Breached</th><td>${ap.compromised_path.length}</td></tr>
+  <tr><th>Lateral Movements</th><td>${ap.lateral_movements.length}</td></tr>
+  <tr><th>Exfiltrated From</th><td>${ap.exfiltrated_hosts.length > 0 ? ap.exfiltrated_hosts.join(', ') : 'None'}</td></tr>
+  <tr><th>Total Attack Actions</th><td>${ap.total_actions}</td></tr>
+  <tr><th>Successful Hits</th><td>${ap.successful_actions}</td></tr>
+</table>
+
+${ap.compromised_path.length > 0 ? `
+<h3>Compromised Host Chain</h3>
+<table>
+  <thead><tr><th>#</th><th>Host</th><th>Method</th></tr></thead>
+  <tbody>
+    ${ap.compromised_path.map((item, i) => `<tr>
+      <td style="text-align:center">${i + 1}</td>
+      <td style="font-weight:600">${item.host}</td>
+      <td>${item.method === 'exploit' ? 'Initial Exploit' : 'Lateral Movement'}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>` : ''}
+
+${ap.lateral_movements.length > 0 ? `
+<h3>Lateral Movement Log</h3>
+<table>
+  <thead><tr><th>Step</th><th>From</th><th>To</th></tr></thead>
+  <tbody>
+    ${ap.lateral_movements.map(m => `<tr>
+      <td style="text-align:center">${m.step}</td>
+      <td>${m.from || 'Unknown'}</td>
+      <td style="font-weight:600">${m.to}</td>
+    </tr>`).join('')}
+  </tbody>
+</table>` : ''}
+` : '<p><em>No successful attack path was established in this simulation.</em></p>'
+
     const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Penetration Test Report — ${selectedScenario?.name || 'Network'}</title>
+<html><head><meta charset="utf-8"><title>AI-Powered Cyber Drill — Security Assessment Report — ${selectedScenario?.name || 'Network'}</title>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; }
   body { font-family:Georgia,'Times New Roman',serif; background:#fff; color:#222; padding:60px 70px; line-height:1.7; font-size:14px; }
@@ -277,15 +367,15 @@ const Report = () => {
 
 <!-- COVER PAGE -->
 <div class="cover">
-  <h1>Penetration Test Report</h1>
-  <p class="subtitle">AI-Powered Cyber Drill System &mdash; Automated Security Assessment</p>
+  <h1>AI-Powered Cyber Drill</h1>
+  <p class="subtitle">Security Assessment Report &mdash; Red vs Blue Adversarial Reinforcement Learning</p>
   <div style="margin:24px 0"><span class="stamp">${blueWon ? 'DEFENDED' : 'BREACHED'}</span></div>
   <div class="meta">
     <strong>Target Network:</strong> ${selectedScenario?.name || 'Unknown Topology'}<br>
     <strong>Assessment Date:</strong> ${reportDate}<br>
     <strong>Report Generated:</strong> ${reportTime}<br>
     <strong>Scope:</strong> ${hosts.length} Hosts | ${edges.length} Network Links | ${allCVEs.length} Vulnerabilities<br>
-    <strong>Methodology:</strong> SB3 DQN Reinforcement Learning (Red/Blue Agents) aligned with MITRE ATT&CK<br>
+    <strong>Methodology:</strong> SB3 MaskablePPO Reinforcement Learning (Red/Blue Agents) aligned with MITRE ATT&CK<br>
     <strong>Classification:</strong> CONFIDENTIAL
   </div>
 </div>
@@ -296,6 +386,7 @@ const Report = () => {
   <li><a href="#exec">Executive Summary</a></li>
   <li><a href="#scope">Scope &amp; Methodology</a></li>
   <li><a href="#sim">Simulation Results</a></li>
+  <li><a href="#attackpath">Red Agent Attack Path</a></li>
   <li><a href="#hosts">Host Risk Assessment</a></li>
   <li><a href="#vulns">Vulnerability Findings</a></li>
   <li><a href="#patch">Patching Priority</a></li>
@@ -309,7 +400,7 @@ const Report = () => {
 
 <!-- 1. EXECUTIVE SUMMARY -->
 <h2 id="exec">1. Executive Summary</h2>
-<p>This report documents the findings of an automated penetration test conducted against the <strong>${selectedScenario?.name || 'target'}</strong> network topology. The assessment utilized AI-driven adversarial agents trained via Stable Baselines3 Deep Q-Network (DQN) reinforcement learning to simulate realistic attack and defense scenarios.</p>
+<p>This report documents the findings of an automated penetration test conducted against the <strong>${selectedScenario?.name || 'target'}</strong> network topology. The assessment utilized AI-driven adversarial agents trained via Stable Baselines3 MaskablePPO (Masked Proximal Policy Optimization) reinforcement learning to simulate realistic attack and defense scenarios.</p>
 
 <p>The target environment consists of <strong>${hosts.length} hosts</strong> connected via <strong>${edges.length} network links</strong>. A total of <strong>${allCVEs.length} vulnerabilities</strong> were identified across the infrastructure, of which <strong>${criticalCount} are rated CRITICAL</strong> and <strong>${highCount} are rated HIGH</strong>.</p>
 
@@ -334,7 +425,7 @@ ${latestSim ? `<p>The automated Red vs Blue simulation ran for <strong>${simStep
 <h3>2.1 Testing Approach</h3>
 <ul>
   <li><strong>Topology Parsing:</strong> Network hosts, services, vulnerabilities (CVEs), and inter-host connectivity were extracted from the uploaded YAML topology file.</li>
-  <li><strong>Agent Training:</strong> Two SB3 DQN agents were trained — a Red agent (attacker) learning to exploit vulnerabilities and a Blue agent (defender) learning to counter attacks.</li>
+  <li><strong>Agent Training:</strong> Two SB3 MaskablePPO agents were trained — a Red agent (attacker) learning to exploit vulnerabilities and a Blue agent (defender) learning to counter attacks.</li>
   <li><strong>Simulation:</strong> Trained agents were deployed in a step-by-step adversarial simulation where the Red agent selects attack actions and the Blue agent responds with defensive measures.</li>
   <li><strong>MITRE ATT&CK Alignment:</strong> All attack and defense actions are mapped to MITRE ATT&CK tactics (Discovery, Initial Access, Privilege Escalation, Lateral Movement, Exfiltration).</li>
 </ul>
@@ -376,6 +467,12 @@ ${simSteps.length > 0 ? `
 </table>
 ` : ''}
 ` : '<p><em>No simulation data available. Run a security drill from the AI Orchestrator to generate results.</em></p>'}
+
+<div class="page-break"></div>
+
+<!-- ATTACK PATH -->
+<h2 id="attackpath">3.5 Red Agent Attack Path</h2>
+${attackPathSection}
 
 <div class="page-break"></div>
 
@@ -466,7 +563,7 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
 
 <div class="footer">
   <p><strong>CONFIDENTIAL</strong> &mdash; AI-Powered Cyber Drill System</p>
-  <p>Automated penetration test report generated using SB3 DQN reinforcement learning agents aligned with MITRE ATT&CK framework</p>
+  <p>Automated penetration test report generated using SB3 MaskablePPO reinforcement learning agents aligned with MITRE ATT&CK framework</p>
   <p>Report Date: ${reportDate} | This document is intended for authorized personnel only.</p>
 </div>
 
@@ -627,35 +724,6 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
                   </tr>
                 )
               })}
-            </tbody>
-          </table>
-        </div>
-      </div>
-
-      {/* MITRE ATT&CK Mapping */}
-      <div className="bg-gray-800/30 border-2 border-green-900/40 p-6">
-        <h2 className="text-xl font-bold text-green-100 mb-4 flex items-center gap-2" style={font}>
-          <FaFireAlt className="text-orange-400" /> MITRE ATT&CK Counter-Actions
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-green-900/30">
-                <th className="text-left p-3 text-red-300/80" style={font}>Red Action</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>MITRE Technique</th>
-                <th className="text-left p-3 text-blue-300/80" style={font}>Blue Counter</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>Implementation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {Object.entries(COUNTER_MAP).map(([red, info], i) => (
-                <tr key={i} className="border-b border-green-900/20">
-                  <td className="p-3 text-red-400 font-bold capitalize" style={font}>{red.replace('_', ' ')}</td>
-                  <td className="p-3 text-green-200/70" style={font}>{info.mitre}</td>
-                  <td className="p-3 text-blue-400 font-bold" style={font}>{info.blue}</td>
-                  <td className="p-3 text-green-200/60 text-xs" style={font}>{info.fix}</td>
-                </tr>
-              ))}
             </tbody>
           </table>
         </div>

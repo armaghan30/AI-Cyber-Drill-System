@@ -29,8 +29,7 @@ def test_choose_action_isolates_on_exploit(blue_agent):
 def test_choose_action_on_scan(blue_agent):
     red_action = {"action": "scan", "target": "H1"}
     result = blue_agent.choose_action(red_action)
-    
-    assert result["action"] in ("patch", "idle", "harden", "detect")
+    assert result["action"] in ("patch", "idle", "harden", "detect", "deploy_firewall")
 
 
 def test_patch_cooldown(blue_agent):

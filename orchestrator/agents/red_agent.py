@@ -34,9 +34,8 @@ class RedAgent:
         }
 
     # ----------------------------EXPLOIT-----------------------------
-    
+
     def exploit(self, host_name: str):
-        
         host = self.env.hosts[host_name]
         vulns = list(getattr(host, "vulnerabilities", []))
 
@@ -49,8 +48,26 @@ class RedAgent:
                 "vulnerabilities": vulns,
             }
 
-        # simple success probability
-        success = random.random() < 0.7
+        # Check firewall
+        fw = getattr(self.env, "firewall_engine", None)
+        if fw and fw.is_active(host_name):
+            host_services = list(getattr(host, "services", []))
+            if fw.is_exploit_blocked(host_name, host_services):
+                print(f" RED: Exploit on {host_name} blocked by firewall.")
+                return {
+                    "action": "exploit",
+                    "success": False,
+                    "target": host_name,
+                    "reason": "firewall_blocked",
+                    "vulnerabilities": vulns,
+                }
+            # Firewall active but not fully blocking → reduced success probability
+            success_prob = 0.2
+            print(f" RED: Firewall on {host_name} is active — exploit probability reduced.")
+        else:
+            success_prob = 0.7
+
+        success = random.random() < success_prob
 
         if success:
             print(f"RED: Successfully exploited {host_name}!")
@@ -119,6 +136,18 @@ class RedAgent:
                 "source": None,
                 "success": False,
                 "reason": "target_isolated",
+            }
+
+        # Check firewall on target before attempting movement
+        fw = getattr(self.env, "firewall_engine", None)
+        if fw and fw.is_lateral_blocked(target_host_name):
+            print(f"  RED: Lateral move to {target_host_name} blocked by firewall.")
+            return {
+                "action": "lateral_move",
+                "target": target_host_name,
+                "source": None,
+                "success": False,
+                "reason": "firewall_blocked",
             }
 
         # Finding a compromised host that is adjacent to the target

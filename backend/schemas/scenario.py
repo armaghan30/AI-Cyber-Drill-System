@@ -22,6 +22,7 @@ class ScenarioResponse(BaseModel):
     filename: str
     num_hosts: int
     description: Optional[str]
+    is_demo: bool = False
     created_at: datetime
     updated_at: Optional[datetime]
 

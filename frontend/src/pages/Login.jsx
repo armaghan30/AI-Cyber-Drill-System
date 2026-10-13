@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { FaEye, FaEyeSlash, FaArrowRight, FaUser, FaLock } from 'react-icons/fa'
+import api from '../api'
 
 const Login = ({ setIsAuthenticated }) => {
   const [formData, setFormData] = useState({ username: '', password: '' })
@@ -14,30 +15,26 @@ const Login = ({ setIsAuthenticated }) => {
     setError('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.username || !formData.password) {
       setError('Please enter both username and password')
       return
     }
 
-    // check if user exists in localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]')
-    const user = users.find(u => u.username === formData.username)
-
-    if (!user) {
-      setError('User not found. Please register first.')
-      return
+    setLoading(true)
+    setError('')
+    try {
+      const result = await api.login(formData.username, formData.password)
+      localStorage.setItem('token', result.token)
+      localStorage.setItem('username', result.username)
+      setIsAuthenticated(true)
+      navigate('/home')
+    } catch (err) {
+      setError(err.message || 'Login failed. Please check your credentials.')
+    } finally {
+      setLoading(false)
     }
-    if (user.password !== formData.password) {
-      setError('Incorrect password')
-      return
-    }
-
-    localStorage.setItem('token', 'local-token-' + Date.now())
-    localStorage.setItem('username', user.username)
-    setIsAuthenticated(true)
-    navigate('/home')
   }
 
   return (

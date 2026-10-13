@@ -88,6 +88,10 @@ class BlueAgent:
         self._trigger_patch_cooldown()
         return {"action": "harden", "target": host_name}
 
+    def make_deploy_firewall_action(self, host_name: str):
+        print(f"  BLUE: Deploying firewall on {host_name}.")
+        return {"action": "deploy_firewall", "target": host_name}
+
     def choose_action(self, last_red_action):
         self._tick_cooldown()
 
@@ -105,6 +109,16 @@ class BlueAgent:
         if compromised_detected and self._can_restore():
             target = random.choice(compromised_detected)
             return self.make_restore_action(target)
+
+        # 2.5) Deploy firewall on unprotected sensitive hosts (25% chance)
+        unprotected_sensitive = [
+            name for name, host in self.env.hosts.items()
+            if not getattr(host, "firewall_active", False)
+            and host.sensitivity in ("high", "medium")
+        ]
+        if unprotected_sensitive and random.random() < 0.25:
+            target = random.choice(unprotected_sensitive)
+            return self.make_deploy_firewall_action(target)
 
         # 3) Randomly detect a host (20% chance)
         host_names = list(self.env.hosts.keys())
@@ -126,5 +140,5 @@ class BlueAgent:
                 else:
                     return self.make_patch_action(target)
 
-        # 5)  idle
+        # 5) idle
         return {"action": "idle", "target": None}

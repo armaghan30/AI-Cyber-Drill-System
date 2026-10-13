@@ -31,6 +31,8 @@ const CommandCentre = () => {
   const [selectedScenarioId, setSelectedScenarioId] = useState(null)
   const [networkHosts, setNetworkHosts] = useState([])
   const [showHelp, setShowHelp] = useState(false)
+  const [hostFilter, setHostFilter] = useState('all') // all | vulnerable | compromised | secure
+  const [hostSort, setHostSort] = useState('risk') // risk | name | cves
   const commandEndRef = useRef(null)
   const inputRef = useRef(null)
   const fileInputRef = useRef(null)
@@ -40,7 +42,8 @@ const CommandCentre = () => {
   }
 
   useEffect(() => {
-    scrollToBottom()
+    // only scroll when there's actual output — not on initial mount
+    if (commandHistory.length > 0) scrollToBottom()
   }, [commandHistory])
 
   const [networkEdges, setNetworkEdges] = useState([])
@@ -140,68 +143,6 @@ const CommandCentre = () => {
         }
         break
 
-      case 'stop':
-        if (args.includes('simulation')) {
-          output = '✓ Simulation stopped\n  Status: Stopped'
-        } else {
-          output = 'Usage: stop simulation'
-        }
-        break
-
-      case 'pause':
-        output = '✓ Simulation paused\n  Status: Paused\n  Agents: Suspended'
-        break
-
-      case 'resume':
-        output = '✓ Simulation resumed\n  Status: Running\n  Agents: Active'
-        break
-
-      case 'load':
-        if (args[0] === 'topology' && args[1]) {
-          output = `✓ Network topology loaded: ${args[1]}\n  Status: Active`
-        } else if (args[0] === 'topology' && uploadedFile) {
-          output = `✓ Network topology loaded: ${uploadedFile.name}\n  File size: ${(uploadedFile.size / 1024).toFixed(2)} KB\n  Status: Active`
-        } else {
-          output = 'Usage: load topology <filename.yaml>\n       Or upload a YAML file using the upload button'
-        }
-        break
-
-      case 'scan':
-        output = '✓ Red team scan initiated\n  Scanning network hosts...\n  Status: Scanning...'
-        break
-
-      case 'exploit':
-        output = '✓ Exploit executed\n  Status: Success'
-        break
-
-      case 'enumerate':
-        output = '✓ Enumeration complete\n  Services discovered on all hosts'
-        break
-
-      case 'isolate':
-        if (args[0] === 'host' && args[1]) {
-          output = `✓ Host isolated: ${args[1]}\n  Status: Quarantined\n  Network: Disconnected`
-        } else {
-          output = 'Usage: isolate host <ip_address>'
-        }
-        break
-
-      case 'patch':
-        if (args[0] === 'vulnerability' && args[1]) {
-          output = `✓ Vulnerability patched: ${args[1]}\n  Status: Applied`
-        } else {
-          output = 'Usage: patch vulnerability <cve_id>'
-        }
-        break
-
-      case 'block':
-        if (args[0] === 'ip' && args[1]) {
-          output = `✓ IP blocked: ${args[1]}\n  Firewall: Rule added`
-        } else {
-          output = 'Usage: block ip <ip_address>'
-        }
-        break
-
       case 'status':
         try {
           const [healthData, stats] = await Promise.all([api.health(), api.dashboard()])
@@ -230,27 +171,33 @@ const CommandCentre = () => {
         }
         break
 
-      case 'logs':
-        if (args[0] === 'attack') {
-          output = 'Latest Attack Logs:\n  [14:45:23] Red agent scan initiated\n  [14:44:18] Exploit attempt on target host\n  [14:43:05] Lateral movement detected'
-        } else if (args[0] === 'defense') {
-          output = 'Latest Defense Logs:\n  [14:45:15] Blue agent patched vulnerability\n  [14:44:30] Host isolated by defense\n  [14:43:12] Network hardened'
-        } else {
-          output = 'Usage: logs attack\n       logs defense\n       logs all'
+      case 'logs': {
+        // show real simulation logs from DB
+        try {
+          const simsList = await api.listMySimulations()
+          if (simsList.length === 0) {
+            output = 'No simulations found. Run a drill from the Attack Simulator first.'
+          } else {
+            const latest = simsList[0]
+            const detail = await api.getSimulation(latest.id)
+            const steps = detail.steps || []
+            const lines = steps.slice(-10).map(s => {
+              const ra = s.red_action?.action || 'idle'
+              const ba = s.blue_action?.action || 'idle'
+              const rt = s.red_action?.target || '—'
+              return `  [Step ${s.step_number}] Red: ${ra} → ${rt} | Blue: ${ba} | R:${s.red_reward?.toFixed(1)} B:${s.blue_reward?.toFixed(1)}`
+            })
+            output = `Last 10 steps from Simulation #${latest.id}:\n${lines.join('\n') || '  No steps recorded.'}`
+          }
+        } catch {
+          output = 'Error fetching logs. Is the backend running?'
         }
         break
-
-      case 'replay':
-        if (args[0]) {
-          output = `✓ Replaying simulation: ${args[0]}\n  Session: Loaded\n  Status: Replaying...`
-        } else {
-          output = 'Usage: replay <session_id>'
-        }
-        break
+      }
 
       case 'generate':
       case 'report':
-        output = '✓ Report generation triggered\n  Check the Analytics page for detailed results.'
+        output = '✓ Navigate to the Security Report page to view and download the full PDF report.'
         break
 
       case 'clear':
@@ -259,24 +206,14 @@ const CommandCentre = () => {
 
       case 'help':
         output = `Available Commands:
-  run simulation [id] [steps] - Run simulation (e.g. run simulation 1 10)
-  stop simulation         - Stop running simulation
-  pause                  - Pause simulation
-  resume                 - Resume paused simulation
-  load topology <file>   - Load network topology YAML
-  scan                   - Trigger red team scan
-  exploit                - Execute exploit
-  enumerate              - Enumerate targets
-  isolate host <ip>      - Isolate host (blue team)
-  patch vulnerability <cve> - Patch vulnerability
-  block ip <address>     - Block IP address
-  status                 - Show real system status
-  list scenarios         - List available scenarios from backend
-  logs [attack|defense]  - View logs
-  replay <session>       - Replay simulation
-  generate report        - Generate report
-  clear                  - Clear console
-  help                   - Show this help menu`
+  run simulation [id] [steps]  Run a Red vs Blue simulation
+                               Example: run simulation 1 15
+  status                       Show backend health and drill statistics
+  list scenarios               List all available network topologies
+  logs                         Show latest simulation step log
+  generate report              Reminder to view Security Report page
+  clear                        Clear console output
+  help                         Show this help`
         break
 
       case '':
@@ -377,11 +314,102 @@ const CommandCentre = () => {
         })}
       </div>
 
+      {/* ═══ NETWORK POSTURE SUMMARY ═══ */}
+      {networkHosts.length > 0 && (() => {
+        const compromised = networkHosts.filter(h => h.status === 'compromised').length
+        const vulnerable  = networkHosts.filter(h => h.status === 'vulnerable').length
+        const secure      = networkHosts.filter(h => h.status === 'secure').length
+        const totalCVEs   = networkHosts.reduce((t, h) => t + h.vulnerabilityList.length, 0)
+        const criticalHost = [...networkHosts].sort((a, b) => b.vulnerabilityList.length - a.vulnerabilityList.length)[0]
+        const highSensCount = networkHosts.filter(h => h.sensitivity === 'high').length
+        const total = networkHosts.length || 1
+        const riskScore = Math.min(100, Math.round((compromised * 40 + vulnerable * 15 + totalCVEs * 3) / total))
+        const riskLabel = riskScore >= 70 ? 'CRITICAL' : riskScore >= 40 ? 'ELEVATED' : riskScore >= 20 ? 'MODERATE' : 'LOW'
+        const riskColor = riskScore >= 70 ? 'text-red-400' : riskScore >= 40 ? 'text-orange-400' : riskScore >= 20 ? 'text-yellow-400' : 'text-green-400'
+        const riskBorder = riskScore >= 70 ? 'border-red-700/60' : riskScore >= 40 ? 'border-orange-700/60' : riskScore >= 20 ? 'border-yellow-700/60' : 'border-green-700/60'
+        const riskBg = riskScore >= 70 ? 'bg-red-950/20' : riskScore >= 40 ? 'bg-orange-950/20' : riskScore >= 20 ? 'bg-yellow-950/20' : 'bg-green-950/20'
+
+        return (
+          <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
+            <h2 className="text-2xl font-bold text-green-100 mb-1" style={{ fontFamily: 'Gugi, sans-serif' }}>Network Posture Summary</h2>
+            <p className="text-green-200/50 text-sm mb-5" style={{ fontFamily: 'Gugi, sans-serif' }}>
+              Real-time view of how exposed your network is — risk score, host health breakdown, and the most critical asset.
+            </p>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-5">
+              {/* Overall Risk Score */}
+              <div className={`border-2 ${riskBorder} ${riskBg} p-5`}>
+                <p className="text-xs text-green-200/50 mb-2" style={{ fontFamily: 'Gugi, sans-serif' }}>OVERALL NETWORK RISK</p>
+                <div className="flex items-baseline gap-2">
+                  <p className={`text-5xl font-bold ${riskColor}`} style={{ fontFamily: 'Gugi, sans-serif' }}>{riskScore}</p>
+                  <p className="text-green-200/40 text-sm" style={{ fontFamily: 'Gugi, sans-serif' }}>/ 100</p>
+                </div>
+                <p className={`text-sm font-bold mt-1 ${riskColor}`} style={{ fontFamily: 'Gugi, sans-serif' }}>{riskLabel} RISK</p>
+                <div className="mt-3 w-full h-3 bg-gray-900/50 border border-green-900/30 overflow-hidden">
+                  <div className={`h-full ${riskScore >= 70 ? 'bg-red-500/70' : riskScore >= 40 ? 'bg-orange-500/70' : riskScore >= 20 ? 'bg-yellow-500/70' : 'bg-green-500/70'}`} style={{ width: `${riskScore}%` }}></div>
+                </div>
+              </div>
+
+              {/* Host Health Breakdown */}
+              <div className="bg-gray-900/30 border border-green-900/30 p-5 lg:col-span-2">
+                <p className="text-xs text-green-200/50 mb-3" style={{ fontFamily: 'Gugi, sans-serif' }}>HOST HEALTH BREAKDOWN</p>
+                <div className="space-y-2">
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-red-300" style={{ fontFamily: 'Gugi, sans-serif' }}><FaLock className="inline mr-1" />Compromised</span>
+                      <span className="text-red-300 font-bold" style={{ fontFamily: 'Gugi, sans-serif' }}>{compromised} / {total}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-900/50 overflow-hidden"><div className="h-full bg-red-500/70" style={{ width: `${(compromised / total) * 100}%` }}></div></div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-yellow-300" style={{ fontFamily: 'Gugi, sans-serif' }}><FaExclamationCircle className="inline mr-1" />Vulnerable</span>
+                      <span className="text-yellow-300 font-bold" style={{ fontFamily: 'Gugi, sans-serif' }}>{vulnerable} / {total}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-900/50 overflow-hidden"><div className="h-full bg-yellow-500/70" style={{ width: `${(vulnerable / total) * 100}%` }}></div></div>
+                  </div>
+                  <div>
+                    <div className="flex items-center justify-between text-xs mb-1">
+                      <span className="text-green-300" style={{ fontFamily: 'Gugi, sans-serif' }}><FaUnlock className="inline mr-1" />Secure</span>
+                      <span className="text-green-300 font-bold" style={{ fontFamily: 'Gugi, sans-serif' }}>{secure} / {total}</span>
+                    </div>
+                    <div className="w-full h-2 bg-gray-900/50 overflow-hidden"><div className="h-full bg-green-500/70" style={{ width: `${(secure / total) * 100}%` }}></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Quick facts row */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <div className="bg-gray-900/30 border border-red-900/30 p-3">
+                <p className="text-[10px] text-red-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>TOTAL CVEs</p>
+                <p className="text-2xl font-bold text-red-400" style={{ fontFamily: 'Gugi, sans-serif' }}>{totalCVEs}</p>
+              </div>
+              <div className="bg-gray-900/30 border border-orange-900/30 p-3">
+                <p className="text-[10px] text-orange-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>MOST EXPOSED HOST</p>
+                <p className="text-sm font-bold text-orange-300 truncate" style={{ fontFamily: 'Gugi, sans-serif' }}>{criticalHost?.hostname || '—'}</p>
+                <p className="text-[10px] text-orange-200/40" style={{ fontFamily: 'Gugi, sans-serif' }}>{criticalHost?.vulnerabilityList.length || 0} CVEs</p>
+              </div>
+              <div className="bg-gray-900/30 border border-purple-900/30 p-3">
+                <p className="text-[10px] text-purple-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>HIGH-VALUE ASSETS</p>
+                <p className="text-2xl font-bold text-purple-300" style={{ fontFamily: 'Gugi, sans-serif' }}>{highSensCount}</p>
+              </div>
+              <div className="bg-gray-900/30 border border-blue-900/30 p-3">
+                <p className="text-[10px] text-blue-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>NETWORK LINKS</p>
+                <p className="text-2xl font-bold text-blue-300" style={{ fontFamily: 'Gugi, sans-serif' }}>{networkEdges.length}</p>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Network Hosts */}
       <div className="bg-gray-800/30 border-2 border-green-900/50 p-6 shadow-xl">
-        <div className="flex items-center justify-between mb-6">
-          <h2 className="text-2xl font-bold text-green-100" style={{ fontFamily: 'Gugi, sans-serif' }}>Network Hosts</h2>
+        <div className="flex items-center justify-between mb-4 flex-wrap gap-3">
+          <div>
+            <h2 className="text-2xl font-bold text-green-100" style={{ fontFamily: 'Gugi, sans-serif' }}>Network Hosts</h2>
+            <p className="text-green-200/50 text-xs mt-0.5" style={{ fontFamily: 'Gugi, sans-serif' }}>Each card represents a host parsed from your YAML topology — hover for details, filter or sort below.</p>
+          </div>
           {scenarios.length > 0 && (
             <select
               value={selectedScenarioId || ''}
@@ -399,6 +427,41 @@ const CommandCentre = () => {
             </select>
           )}
         </div>
+
+        {/* Filter + sort row */}
+        {networkHosts.length > 0 && (
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4 pb-3 border-b border-green-900/30">
+            <div className="flex flex-wrap gap-2">
+              {[
+                { key: 'all', label: `All (${networkHosts.length})`, color: 'border-green-700/50 text-green-200' },
+                { key: 'compromised', label: `Compromised (${networkHosts.filter(h => h.status === 'compromised').length})`, color: 'border-red-700/50 text-red-300' },
+                { key: 'vulnerable', label: `Vulnerable (${networkHosts.filter(h => h.status === 'vulnerable').length})`, color: 'border-yellow-700/50 text-yellow-300' },
+                { key: 'secure', label: `Secure (${networkHosts.filter(h => h.status === 'secure').length})`, color: 'border-green-700/50 text-green-300' },
+              ].map(f => (
+                <button
+                  key={f.key}
+                  onClick={() => setHostFilter(f.key)}
+                  className={`px-3 py-1.5 border-2 text-xs ${f.color} transition-all ${hostFilter === f.key ? 'bg-green-900/40 ring-1 ring-green-500' : 'bg-transparent hover:bg-green-900/20'}`}
+                  style={{ fontFamily: 'Gugi, sans-serif' }}
+                >{f.label}</button>
+              ))}
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-green-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>Sort:</span>
+              <select
+                value={hostSort}
+                onChange={(e) => setHostSort(e.target.value)}
+                className="bg-gray-900/50 border border-green-900/50 text-green-100 px-3 py-1 text-xs focus:outline-none focus:border-green-800"
+                style={{ fontFamily: 'Gugi, sans-serif' }}
+              >
+                <option value="risk">By Risk (highest first)</option>
+                <option value="cves">By CVE Count</option>
+                <option value="name">By Hostname</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {scenarios.length === 0 ? (
             <div className="col-span-full text-center py-12 text-green-200/50 space-y-3" style={{ fontFamily: 'Gugi, sans-serif' }}>
@@ -410,7 +473,28 @@ const CommandCentre = () => {
             <div className="col-span-full text-center py-8 text-green-200/50" style={{ fontFamily: 'Gugi, sans-serif' }}>
               Loading hosts...
             </div>
-          ) : networkHosts.map((host) => (
+          ) : (() => {
+            const sensRank = { high: 0, medium: 1, low: 2 }
+            const filtered = networkHosts.filter(h => hostFilter === 'all' ? true : h.status === hostFilter)
+            const sorted = [...filtered].sort((a, b) => {
+              if (hostSort === 'cves') return b.vulnerabilityList.length - a.vulnerabilityList.length
+              if (hostSort === 'name') return a.hostname.localeCompare(b.hostname)
+              // risk: compromised > vulnerable > secure, then more CVEs, then higher sensitivity
+              const statusRank = { compromised: 0, vulnerable: 1, secure: 2 }
+              const ds = (statusRank[a.status] ?? 9) - (statusRank[b.status] ?? 9)
+              if (ds !== 0) return ds
+              const dc = b.vulnerabilityList.length - a.vulnerabilityList.length
+              if (dc !== 0) return dc
+              return (sensRank[a.sensitivity] ?? 9) - (sensRank[b.sensitivity] ?? 9)
+            })
+            if (sorted.length === 0) {
+              return (
+                <div className="col-span-full text-center py-8 text-green-200/40 text-sm" style={{ fontFamily: 'Gugi, sans-serif' }}>
+                  No hosts match the current filter.
+                </div>
+              )
+            }
+            return sorted.map((host) => (
             <div
               key={host.id}
               className="bg-gray-900/20 border-2 border-green-900/50 p-4 hover:border-green-800 transition-all"
@@ -418,9 +502,9 @@ const CommandCentre = () => {
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center space-x-2">
                   <FaDesktop className={`text-xl ${
-                    host.status === 'compromised' ? 'text-green-400' :
+                    host.status === 'compromised' ? 'text-red-400' :
                     host.status === 'vulnerable' ? 'text-yellow-400' :
-                    'text-blue-400'
+                    'text-green-400'
                   }`} />
                   <div>
                     <h3 className="font-semibold text-green-100" style={{ fontFamily: 'Gugi, sans-serif' }}>{host.hostname}</h3>
@@ -428,11 +512,11 @@ const CommandCentre = () => {
                   </div>
                 </div>
                 {host.status === 'compromised' ? (
-                  <FaLock className="text-green-400 animate-pulse" />
+                  <FaLock className="text-red-400 animate-pulse" />
                 ) : host.status === 'vulnerable' ? (
                   <FaExclamationCircle className="text-yellow-400 animate-pulse" />
                 ) : (
-                  <FaUnlock className="text-blue-400" />
+                  <FaUnlock className="text-green-400" />
                 )}
               </div>
 
@@ -444,9 +528,9 @@ const CommandCentre = () => {
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-green-200/70" style={{ fontFamily: 'Gugi, sans-serif' }}>Status:</span>
                   <span className={`px-2 py-0.5 text-xs ${
-                    host.status === 'compromised' ? 'bg-green-900/30 border border-green-700/50 text-green-400' :
+                    host.status === 'compromised' ? 'bg-red-900/30 border border-red-700/50 text-red-400' :
                     host.status === 'vulnerable' ? 'bg-yellow-900/30 border border-yellow-700/50 text-yellow-400' :
-                    'bg-blue-900/30 border border-blue-700/50 text-blue-400'
+                    'bg-green-900/30 border border-green-700/50 text-green-400'
                   }`} style={{ fontFamily: 'Gugi, sans-serif' }}>
                     {host.status.toUpperCase()}
                   </span>
@@ -509,7 +593,8 @@ const CommandCentre = () => {
                 </div>
               )}
             </div>
-          ))}
+          ))
+          })()}
         </div>
       </div>
 
@@ -555,35 +640,19 @@ const CommandCentre = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {[
               { category: 'Simulation', commands: [
-                { cmd: 'run simulation [id] [steps]', desc: 'Run a simulation on a scenario' },
-                { cmd: 'stop simulation', desc: 'Stop the running simulation' },
-                { cmd: 'pause', desc: 'Pause current simulation' },
-                { cmd: 'resume', desc: 'Resume paused simulation' },
+                { cmd: 'run simulation [id] [steps]', desc: 'Run a Red vs Blue AI simulation — e.g. run simulation 1 15' },
               ]},
-              { category: 'Red Team', commands: [
-                { cmd: 'scan', desc: 'Initiate red team network scan' },
-                { cmd: 'exploit', desc: 'Execute exploit on target' },
-                { cmd: 'enumerate', desc: 'Enumerate network targets' },
+              { category: 'System Info', commands: [
+                { cmd: 'status', desc: 'Show real system status — backend health, sim and training counts' },
+                { cmd: 'list scenarios', desc: 'List all uploaded network topologies from backend' },
               ]},
-              { category: 'Blue Team', commands: [
-                { cmd: 'isolate host <ip>', desc: 'Quarantine a compromised host' },
-                { cmd: 'patch vulnerability <cve>', desc: 'Patch a specific vulnerability' },
-                { cmd: 'block ip <address>', desc: 'Add firewall rule to block IP' },
-              ]},
-              { category: 'Topology', commands: [
-                { cmd: 'list scenarios', desc: 'List all available scenarios' },
-                { cmd: 'load topology <file>', desc: 'Load a YAML topology file' },
-              ]},
-              { category: 'Monitoring', commands: [
-                { cmd: 'status', desc: 'Show real system status from backend' },
-                { cmd: 'logs attack', desc: 'View attack activity logs' },
-                { cmd: 'logs defense', desc: 'View defense activity logs' },
+              { category: 'Logs & Reports', commands: [
+                { cmd: 'logs', desc: 'Show latest simulation step log (last 10 steps)' },
+                { cmd: 'generate report', desc: 'Reminder to open the Security Report page for PDF' },
               ]},
               { category: 'Utility', commands: [
-                { cmd: 'replay <session>', desc: 'Replay a simulation session' },
-                { cmd: 'generate report', desc: 'Generate analysis report' },
                 { cmd: 'clear', desc: 'Clear the console output' },
-                { cmd: 'help', desc: 'Show help in console' },
+                { cmd: 'help', desc: 'Show available commands' },
               ]},
             ].map((group, gi) => (
               <div key={gi} className="bg-gray-900/20 border border-green-900/30 p-4">

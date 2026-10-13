@@ -1,0 +1,825 @@
+network:
+  hosts:
+    H1:
+      os: linux
+      services:
+      - http
+      - https
+      - dns
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H2:
+      os: linux
+      services:
+      - http
+      - https
+      - smtp
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H3:
+      os: linux
+      services:
+      - http
+      - https
+      - proxy
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H4:
+      os: windows
+      services:
+      - http
+      - https
+      - rdp
+      vulnerabilities:
+      - CVE-2019-0708
+      - CVE-2021-34535
+      sensitivity: low
+    H5:
+      os: linux
+      services:
+      - smtp
+      - imap
+      - https
+      vulnerabilities:
+      - CVE-2021-26855
+      - CVE-2021-26857
+      sensitivity: low
+    H6:
+      os: linux
+      services:
+      - dns
+      - http
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H7:
+      os: linux
+      services:
+      - http
+      - https
+      - ftp
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H8:
+      os: windows
+      services:
+      - http
+      - https
+      - smb
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: low
+    H9:
+      os: linux
+      services:
+      - https
+      - ssh
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      sensitivity: low
+    H10:
+      os: linux
+      services:
+      - http
+      - https
+      - ntp
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      sensitivity: low
+    H11:
+      os: linux
+      services:
+      - http
+      - ssh
+      - docker
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H12:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - http
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H13:
+      os: linux
+      services:
+      - http
+      - ssh
+      - memcached
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H14:
+      os: windows
+      services:
+      - smb
+      - mssql
+      - rdp
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H15:
+      os: linux
+      services:
+      - ssh
+      - nfs
+      - http
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H16:
+      os: windows
+      services:
+      - rdp
+      - smb
+      - winrm
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H17:
+      os: linux
+      services:
+      - ssh
+      - http
+      - redis
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      - CVE-2022-22965
+      sensitivity: medium
+    H18:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - http
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H19:
+      os: linux
+      services:
+      - ssh
+      - docker
+      - http
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H20:
+      os: windows
+      services:
+      - rdp
+      - smb
+      - mssql
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H21:
+      os: linux
+      services:
+      - ssh
+      - http
+      - tomcat
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      - CVE-2022-22965
+      sensitivity: medium
+    H22:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - winrm
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H23:
+      os: linux
+      services:
+      - ssh
+      - http
+      - elasticsearch
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      - CVE-2022-22965
+      sensitivity: medium
+    H24:
+      os: windows
+      services:
+      - rdp
+      - smb
+      - http
+      vulnerabilities:
+      - CVE-2019-0708
+      - CVE-2021-34535
+      - CVE-2022-21990
+      sensitivity: medium
+    H25:
+      os: linux
+      services:
+      - ssh
+      - kafka
+      - http
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H26:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - mssql
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H27:
+      os: linux
+      services:
+      - ssh
+      - http
+      - nginx
+      vulnerabilities:
+      - CVE-2021-44228
+      - CVE-2023-44487
+      - CVE-2022-22965
+      sensitivity: medium
+    H28:
+      os: windows
+      services:
+      - rdp
+      - smb
+      - winrm
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H29:
+      os: linux
+      services:
+      - ssh
+      - http
+      - rabbitmq
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      sensitivity: medium
+    H30:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - http
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      sensitivity: medium
+    H31:
+      os: linux
+      services:
+      - postgresql
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H32:
+      os: windows
+      services:
+      - mssql
+      - smb
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H33:
+      os: linux
+      services:
+      - mongodb
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H34:
+      os: windows
+      services:
+      - mssql
+      - rdp
+      - smb
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H35:
+      os: linux
+      services:
+      - mysql
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H36:
+      os: windows
+      services:
+      - ldap
+      - smb
+      - rdp
+      - dns
+      vulnerabilities:
+      - CVE-2020-1472
+      - CVE-2021-34527
+      - CVE-2021-1675
+      - CVE-2022-26923
+      sensitivity: high
+    H37:
+      os: windows
+      services:
+      - ldap
+      - smb
+      - rdp
+      - kerberos
+      vulnerabilities:
+      - CVE-2020-1472
+      - CVE-2021-34527
+      - CVE-2021-1675
+      - CVE-2022-26923
+      sensitivity: high
+    H38:
+      os: linux
+      services:
+      - ssh
+      - nfs
+      - rsync
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      - CVE-2016-5195
+      sensitivity: high
+    H39:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - winrm
+      vulnerabilities:
+      - CVE-2020-1472
+      - CVE-2021-34527
+      - CVE-2021-1675
+      - CVE-2022-26923
+      sensitivity: high
+    H40:
+      os: linux
+      services:
+      - ssh
+      - elasticsearch
+      - http
+      vulnerabilities:
+      - CVE-2022-0847
+      - CVE-2021-3156
+      - CVE-2021-4034
+      - CVE-2016-5195
+      sensitivity: high
+    H41:
+      os: linux
+      services:
+      - postgresql
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H42:
+      os: windows
+      services:
+      - mssql
+      - smb
+      - rdp
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H43:
+      os: linux
+      services:
+      - mongodb
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H44:
+      os: windows
+      services:
+      - smb
+      - ldap
+      - rdp
+      vulnerabilities:
+      - CVE-2020-1472
+      - CVE-2021-34527
+      - CVE-2021-1675
+      - CVE-2022-26923
+      sensitivity: high
+    H45:
+      os: linux
+      services:
+      - redis
+      - ssh
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H46:
+      os: windows
+      services:
+      - mssql
+      - smb
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H47:
+      os: linux
+      services:
+      - ssh
+      - cassandra
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H48:
+      os: windows
+      services:
+      - smb
+      - rdp
+      - mssql
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      - CVE-2021-34527
+      - CVE-2020-1472
+      sensitivity: high
+    H49:
+      os: linux
+      services:
+      - ssh
+      - postgresql
+      - nfs
+      vulnerabilities:
+      - CVE-2023-0386
+      - CVE-2022-2588
+      - CVE-2021-3493
+      - CVE-2021-4034
+      sensitivity: high
+    H50:
+      os: windows
+      services:
+      - ldap
+      - smb
+      - kerberos
+      - dns
+      vulnerabilities:
+      - CVE-2020-1472
+      - CVE-2021-34527
+      - CVE-2021-1675
+      - CVE-2022-26923
+      sensitivity: high
+  edges:
+  - - H1
+    - H11
+  - - H1
+    - H12
+  - - H2
+    - H11
+  - - H2
+    - H15
+  - - H3
+    - H13
+  - - H3
+    - H17
+  - - H4
+    - H12
+  - - H4
+    - H14
+  - - H5
+    - H15
+  - - H5
+    - H19
+  - - H6
+    - H11
+  - - H6
+    - H16
+  - - H7
+    - H13
+  - - H7
+    - H18
+  - - H8
+    - H14
+  - - H8
+    - H20
+  - - H9
+    - H21
+  - - H9
+    - H23
+  - - H10
+    - H22
+  - - H10
+    - H24
+  - - H11
+    - H12
+  - - H11
+    - H13
+  - - H11
+    - H14
+  - - H12
+    - H13
+  - - H12
+    - H14
+  - - H13
+    - H14
+  - - H15
+    - H16
+  - - H15
+    - H17
+  - - H15
+    - H18
+  - - H16
+    - H17
+  - - H16
+    - H18
+  - - H17
+    - H18
+  - - H19
+    - H20
+  - - H19
+    - H21
+  - - H19
+    - H22
+  - - H20
+    - H21
+  - - H20
+    - H22
+  - - H21
+    - H22
+  - - H23
+    - H24
+  - - H23
+    - H25
+  - - H23
+    - H26
+  - - H24
+    - H25
+  - - H24
+    - H26
+  - - H25
+    - H26
+  - - H27
+    - H28
+  - - H27
+    - H29
+  - - H27
+    - H30
+  - - H28
+    - H29
+  - - H28
+    - H30
+  - - H29
+    - H30
+  - - H14
+    - H15
+  - - H18
+    - H19
+  - - H22
+    - H23
+  - - H26
+    - H27
+  - - H11
+    - H31
+  - - H12
+    - H32
+  - - H13
+    - H33
+  - - H14
+    - H34
+  - - H15
+    - H35
+  - - H16
+    - H31
+  - - H17
+    - H32
+  - - H18
+    - H33
+  - - H19
+    - H41
+  - - H20
+    - H42
+  - - H21
+    - H43
+  - - H22
+    - H44
+  - - H23
+    - H45
+  - - H24
+    - H46
+  - - H25
+    - H37
+  - - H26
+    - H38
+  - - H27
+    - H39
+  - - H28
+    - H40
+  - - H29
+    - H47
+  - - H30
+    - H48
+  - - H36
+    - H31
+  - - H36
+    - H32
+  - - H36
+    - H33
+  - - H36
+    - H34
+  - - H36
+    - H35
+  - - H36
+    - H37
+  - - H36
+    - H38
+  - - H36
+    - H39
+  - - H36
+    - H40
+  - - H36
+    - H41
+  - - H36
+    - H42
+  - - H36
+    - H43
+  - - H36
+    - H44
+  - - H36
+    - H45
+  - - H36
+    - H46
+  - - H36
+    - H47
+  - - H36
+    - H48
+  - - H36
+    - H49
+  - - H36
+    - H50
+  - - H37
+    - H31
+  - - H37
+    - H32
+  - - H37
+    - H33
+  - - H37
+    - H34
+  - - H37
+    - H35
+  - - H37
+    - H38
+  - - H37
+    - H39
+  - - H37
+    - H40
+  - - H37
+    - H41
+  - - H37
+    - H42
+  - - H37
+    - H43
+  - - H37
+    - H44
+  - - H37
+    - H45
+  - - H37
+    - H46
+  - - H37
+    - H47
+  - - H37
+    - H48
+  - - H37
+    - H49
+  - - H37
+    - H50
+  - - H50
+    - H31
+  - - H50
+    - H32
+  - - H50
+    - H33
+  - - H50
+    - H34
+  - - H50
+    - H35
+  - - H50
+    - H38
+  - - H50
+    - H39
+  - - H50
+    - H40
+  - - H50
+    - H41
+  - - H50
+    - H42
+  - - H50
+    - H43
+  - - H50
+    - H44
+  - - H50
+    - H45
+  - - H50
+    - H46
+  - - H50
+    - H47
+  - - H50
+    - H48
+  - - H50
+    - H49
+  - - H31
+    - H32
+  - - H33
+    - H34
+  - - H35
+    - H41
+  - - H42
+    - H43
+  - - H44
+    - H45
+  - - H46
+    - H47
+  - - H48
+    - H49

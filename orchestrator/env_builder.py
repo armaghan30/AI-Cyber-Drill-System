@@ -1,6 +1,7 @@
 
-import copy
 import datetime
+
+from orchestrator.firewall_engine import FirewallEngine
 
 
 class Host:
@@ -18,13 +19,15 @@ class Host:
         self.detected = False
         self.hardened_level = 0
         self.data_exfiltrated = False
+        self.firewall_active = False
 
     def __repr__(self):
         return (
             f"<Host {self.name}, compromised={self.is_compromised}, "
             f"access={self.access_level}, vulns={len(self.vulnerabilities)}, "
             f"isolated={self.is_isolated}, detected={self.detected}, "
-            f"hardened={self.hardened_level}, exfil={self.data_exfiltrated}>"
+            f"hardened={self.hardened_level}, exfil={self.data_exfiltrated}, "
+            f"firewall={self.firewall_active}>"
         )
 
     def to_state_dict(self):
@@ -36,24 +39,24 @@ class Host:
             "detected": self.detected,
             "hardened_level": self.hardened_level,
             "data_exfiltrated": self.data_exfiltrated,
+            "firewall_active": self.firewall_active,
         }
 
 
 class Environment:
-   
 
     def __init__(self, topology_data):
         self.topology_data = topology_data
         self.hosts = {}
         self.edges = []
         self.step_count = 0
+        self.firewall_engine: FirewallEngine | None = None
 
         self._build()
 
     # -------------------Build environment from YAML----------------------------
-    
+
     def _build(self):
-        
         network = self.topology_data["network"]
 
         for host_name, details in network["hosts"].items():
@@ -67,6 +70,17 @@ class Environment:
             self.hosts[host_name] = host_obj
 
         self.edges = list(network.get("edges", []))
+
+        # Build firewall engine — works for any topology size (2–50+ hosts)
+        self.firewall_engine = FirewallEngine()
+        fw_rules = network.get("firewall_rules", {})
+        if fw_rules:
+            # Explicit per-host rules defined in the YAML take priority
+            self.firewall_engine.load_topology_rules(fw_rules)
+        # Auto-fill rules for every host not covered by the YAML section.
+        # For user-uploaded topologies with no firewall_rules section this
+        # generates sensible defaults for all hosts automatically.
+        self.firewall_engine.auto_generate_rules(self.hosts)
 
     # ------------------Reset--------------------------------
     
@@ -140,6 +154,13 @@ class Environment:
                 host.vulnerabilities = host.vulnerabilities[remove_count:]
                 host.hardened_level += 1
 
+            elif b_type == "deploy_firewall" and target in self.hosts:
+                host = self.hosts[target]
+                if self.firewall_engine:
+                    newly_deployed = self.firewall_engine.deploy(target, self.step_count)
+                    host.firewall_active = self.firewall_engine.is_active(target)
+                    # Store result so reward engine can detect duplicate deployments
+                    blue_action["newly_deployed"] = newly_deployed
 
         # 3. Increase step counter
         self.step_count += 1
@@ -148,7 +169,7 @@ class Environment:
         return self._snapshot()
 
     # ---------------------Snapshot (used by Orchestrator, RL, RewardEngine)-------
-    
+
     def _snapshot(self):
         return {
             "step": self.step_count,
@@ -157,5 +178,9 @@ class Environment:
                 name: host.to_state_dict()
                 for name, host in self.hosts.items()
             },
-            "edges": copy.deepcopy(self.edges),
+            "edges": list(self.edges),
+            "firewall_status": (
+                self.firewall_engine.get_status()
+                if self.firewall_engine else {}
+            ),
         }

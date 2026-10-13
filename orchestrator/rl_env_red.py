@@ -134,6 +134,34 @@ class RedRLEnvironment(gym.Env):
         return np.array(obs_vec, dtype=np.float32), float(red_reward), terminated, truncated, info
 
     # ------------------------------------------------------------
+    def action_masks(self) -> np.ndarray:
+        n = len(self.host_order)
+        mask = np.ones(self.action_dim, dtype=bool)
+        acc_map = {"none": 0, "user": 1, "root": 2}
+
+        for i, hname in enumerate(self.host_order):
+            host = self.environment.hosts[hname]
+            comp = host.is_compromised
+            acc  = acc_map.get(host.access_level, 0)
+            iso  = host.is_isolated
+
+            # exploit: skip if already compromised or host is isolated
+            if comp or iso:
+                mask[n + i] = False
+            # escalate: only if compromised and not yet root
+            if not comp or acc >= 2:
+                mask[2 * n + i] = False
+            # lateral_move: only toward hosts not yet compromised
+            if comp:
+                mask[3 * n + i] = False
+            # exfiltrate: only from compromised hosts
+            if not comp:
+                mask[4 * n + i] = False
+
+        # idle is always valid (last slot)
+        return mask
+
+    # ------------------------------------------------------------
     def render(self):
         snapshot = self.orch._snapshot_environment()
         print(f"[RED ENV] Step {self.current_step}/{self.max_steps}")

@@ -12,8 +12,7 @@ import {
   FaNetworkWired,
   FaShieldAlt,
   FaBrain,
-  FaDatabase,
-  FaHome
+  FaHome,
 } from 'react-icons/fa'
 
 const Layout = ({ setIsAuthenticated }) => {
@@ -33,7 +32,6 @@ const Layout = ({ setIsAuthenticated }) => {
     { path: '/network-monitor', icon: FaNetworkWired, label: 'Network Monitor' },
     { path: '/analytics', icon: FaChartBar, label: 'Analytics' },
     { path: '/report', icon: FaShieldAlt, label: 'Security Report' },
-    { path: '/training-results', icon: FaDatabase, label: 'Training Results' },
     { path: '/settings', icon: FaCog, label: 'Settings' },
   ]
 

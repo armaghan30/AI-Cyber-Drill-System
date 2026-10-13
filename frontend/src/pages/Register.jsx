@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate, Link } from 'react-router-dom'
 import { FaEye, FaEyeSlash, FaArrowRight, FaArrowLeft, FaCheck, FaUser, FaEnvelope, FaLock } from 'react-icons/fa'
+import api from '../api'
 
 const Register = ({ setIsAuthenticated }) => {
   const [formData, setFormData] = useState({ username: '', email: '', password: '', confirmPassword: '' })
@@ -15,7 +16,7 @@ const Register = ({ setIsAuthenticated }) => {
     setError('')
   }
 
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.username || !formData.email || !formData.password || !formData.confirmPassword) {
       setError('Please fill in all fields')
@@ -30,23 +31,19 @@ const Register = ({ setIsAuthenticated }) => {
       return
     }
 
-    // save user to localStorage
-    const users = JSON.parse(localStorage.getItem('users') || '[]')
-    if (users.find(u => u.username === formData.username)) {
-      setError('Username already taken')
-      return
+    setLoading(true)
+    setError('')
+    try {
+      const result = await api.register(formData.username, formData.email, formData.password)
+      localStorage.setItem('token', result.token)
+      localStorage.setItem('username', result.username)
+      setIsAuthenticated(true)
+      navigate('/home')
+    } catch (err) {
+      setError(err.message || 'Registration failed. Please try again.')
+    } finally {
+      setLoading(false)
     }
-    if (users.find(u => u.email === formData.email)) {
-      setError('Email already registered')
-      return
-    }
-
-    users.push({ username: formData.username, email: formData.email, password: formData.password })
-    localStorage.setItem('users', JSON.stringify(users))
-    localStorage.setItem('token', 'local-token-' + Date.now())
-    localStorage.setItem('username', formData.username)
-    setIsAuthenticated(true)
-    navigate('/home')
   }
 
   const passwordRequirements = [

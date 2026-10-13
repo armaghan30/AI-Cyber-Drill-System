@@ -1,0 +1,10 @@
+topology,role,algorithm,seed,timesteps,eval_episodes,mean_return,mean_hosts_compromised,mean_hosts_exfiltrated,invalid_action_rate,train_seconds
+topology_8host,red,dqn,0,50000,50,223.6,4.22,0.84,0.006,309.5
+topology_8host,red,dqn,1,50000,50,237.24,4.12,0.78,0.01,313.0
+topology_8host,red,dqn,2,50000,50,222.38,3.98,0.44,0.006,308.5
+topology_8host,red,ppo,0,50000,50,152.7,3.88,0.84,0.139,385.2
+topology_8host,red,ppo,1,50000,50,185.96,4.18,0.88,0.042,393.6
+topology_8host,red,ppo,2,50000,50,147.48,4.18,0.74,0.299,449.4
+topology_8host,red,maskable_ppo,0,50000,50,259.66,6.18,0.9,0.0,476.2
+topology_8host,red,maskable_ppo,1,50000,50,245.36,6.18,0.7,0.0,370.6
+topology_8host,red,maskable_ppo,2,50000,50,236.82,6.04,0.68,0.0,353.0

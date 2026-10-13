@@ -1,98 +1,123 @@
-# Cyber App - Modern React Web Application
+# AI-Powered Cyber Drill System — Frontend
 
-A fully functional, modern web application built with React, Tailwind CSS, and Vite. Features a beautiful login page with video background, comprehensive dashboard, and multiple management pages.
+React single-page application for the AI-Powered Cyber Drill System FYP. Provides the dashboard, drill launcher, live simulation views, analytics, and security report UI on top of the FastAPI backend.
 
-## Features
-
-- 🎨 **Modern UI Design** - Beautiful, responsive interface with Tailwind CSS
-- 🎬 **Video Background Login** - Stunning login page with video background
-- 🤖 **Robot Gallery** - Showcase robot images with hover effects
-- 📊 **Dashboard** - Comprehensive analytics and statistics
-- 👥 **User Management** - Complete user management system
-- 🤖 **Robot Management** - Manage robot fleet with status controls
-- 📈 **Analytics** - Visual charts and performance metrics
-- ⚙️ **Settings** - Comprehensive settings management
-- 👤 **Profile** - User profile management
+---
 
 ## Tech Stack
 
-- **React 18** - UI library
-- **React Router** - Routing
-- **Tailwind CSS** - Styling
-- **Vite** - Build tool
-- **React Icons** - Icon library
+- **React 18** — UI library
+- **Vite** — Dev server and build tool
+- **Tailwind CSS** — Utility-first styling
+- **React Router v6** — Client-side routing
+- **React Icons** — Icon set
+- **Recharts** — Reward timelines and analytics charts
 
-## Installation
+---
 
-1. Install dependencies:
-```bash
-npm install
-```
+## Pages
 
-2. Start development server:
-```bash
-npm run dev
-```
+### Authenticated (inside `Layout` with sidebar)
 
-3. Build for production:
-```bash
-npm run build
-```
+| Path | Component | Purpose |
+|------|-----------|---------|
+| `/home` | `Home.jsx` | Landing page with quick stats |
+| `/ai-orchestrator` | `AIOrchestrator.jsx` | Upload a topology and launch a drill. Streams the 3-stage pipeline: `uploaded` → `simulating` → `done` |
+| `/network-monitor` | `CommandCentre.jsx` | Live host status grid during a drill |
+| `/analytics` | `Analytics.jsx` | Per-drill reward timeline, action distribution, attack path, CVE inventory, step log |
+| `/report` | `Report.jsx` | Printable security report (cover, executive summary, host risk, CVEs, simulation steps, firewall, MITRE, remediation) |
+| `/settings` | `Settings.jsx` | User preferences and RL algorithm settings |
+| `/profile` | `Profile.jsx` | Account details |
+
+The sidebar exposes exactly six pages: Home, AI Orchestrator, Network Monitor, Analytics, Security Report, Settings. Profile is reachable from the layout but not the sidebar.
+
+### Unauthenticated
+
+| Path | Component | Purpose |
+|------|-----------|---------|
+| `/login` | `Login.jsx` | Sign in (HMAC bearer token cached in `localStorage`) |
+| `/register` | `Register.jsx` | Create a new user |
+| `/forgot-password` | `ForgotPassword.jsx` | Password reset flow |
+
+---
 
 ## Project Structure
 
 ```
-cyber/
-├── src/
-│   ├── components/
-│   │   └── Layout.jsx          # Main layout with sidebar
-│   ├── pages/
-│   │   ├── Login.jsx           # Login page with video background
-│   │   ├── Dashboard.jsx       # Main dashboard
-│   │   ├── Robots.jsx          # Robot management
-│   │   ├── Users.jsx           # User management
-│   │   ├── Analytics.jsx       # Analytics page
-│   │   ├── Settings.jsx        # Settings page
-│   │   └── Profile.jsx         # User profile
-│   ├── App.jsx                 # Main app component
-│   ├── main.jsx                # Entry point
-│   └── index.css               # Global styles
-├── public/
-│   ├── 142363-780562112_medium.mp4  # Login video
-│   ├── simple robot.jpg        # Robot image
-│   └── robot-smash.jpg         # Robot image
-└── package.json
+frontend/
+|-- src/
+|   |-- App.jsx                 Route definitions + auth gate
+|   |-- main.jsx                Entry point
+|   |-- index.css               Tailwind directives + global styles
+|   |-- api.js                  Backend client (fetch wrapper, token handling)
+|   |-- components/
+|   |   |-- Layout.jsx          Sidebar + outlet for authenticated routes
+|   |-- pages/                  Page components (see table above)
+|
+|-- index.html                  Vite entry HTML
+|-- package.json
+|-- vite.config.js
+|-- tailwind.config.js
+|-- postcss.config.js
+|-- README.md
 ```
 
-## Pages
+---
 
-- **Login** - Authentication page with video background
-- **Dashboard** - Overview with stats, robot gallery, and activity
-- **Robots** - Manage robot fleet with search and filters
-- **Users** - User management with table view
-- **Analytics** - Charts and performance metrics
-- **Settings** - Application settings management
-- **Profile** - User profile and account settings
+## Installation
 
-## Features
+```bash
+npm install
+```
 
-- Fully responsive design
-- Modern UI with Tailwind CSS
-- Video background on login
-- Interactive components
-- Search and filter functionality
-- Status management
-- Form handling
-- Routing and navigation
+---
 
-## Usage
+## How to Run
 
-1. Start the app and navigate to `/login`
-2. Enter any username and password to login
-3. Explore the dashboard and various pages
-4. Use the sidebar to navigate between pages
+### Development server (with hot reload)
 
-## License
+```bash
+npm run dev
+```
 
-MIT
+Vite serves on `http://localhost:5173` by default. The backend must be running on `http://localhost:8000` — see the root `README.md` for the backend run command.
 
+### Production build
+
+```bash
+npm run build
+```
+
+Outputs static assets to `dist/`. The backend's CORS config already allows the Vite dev origins (5173–5174) and common React dev origins (3000–3003).
+
+---
+
+## Backend Communication
+
+All API calls go through `src/api.js`, which:
+
+- Prepends the backend base URL (`http://localhost:8000/api`)
+- Attaches the `Authorization: Bearer <token>` header from `localStorage`
+- Returns parsed JSON or throws on non-2xx responses
+
+Auth flow:
+1. `Login.jsx` calls `POST /api/auth/login` and stores the returned token + username in `localStorage`.
+2. `App.jsx` runs `api.me()` on every mount to validate the cached token — if the backend was reset between sessions, the stale token is cleared and the user is bounced back to `/login`.
+3. The user logs out via the sidebar, which clears `localStorage` and flips `isAuthenticated` to `false`.
+
+---
+
+## Persistence
+
+A small amount of UI state is kept in `localStorage` so it survives navigation and reload:
+
+- `token`, `username` — auth state
+- AI Orchestrator drill stage — keeps the active drill alive across tab navigation
+
+---
+
+## Notes for Reviewers
+
+- The drill itself runs server-side. The frontend polls `/api/simulations/{id}` (or step endpoints) to stream live progress.
+- The Security Report has **two PDF paths**: a backend-rendered version (`pdf_service.py`, ReportLab) and a frontend `window.print()` version (`Report.jsx`). Both cover the same sections.
+- The Analytics page intentionally omits an aggregated "Overall Defense Performance" panel — per-scenario metrics are the project's preferred presentation.

@@ -1,0 +1,125 @@
+network:
+  hosts:
+    WebServer:
+      os: linux
+      services:
+        - http
+        - https
+        - ssh
+      vulnerabilities:
+        - CVE-2023-44487
+        - CVE-2021-41773
+        - CVE-2019-0211
+      sensitivity: high
+
+    MailServer:
+      os: linux
+      services:
+        - smtp
+        - imap
+        - ssh
+      vulnerabilities:
+        - CVE-2021-34527
+        - CVE-2022-0847
+      sensitivity: medium
+
+    WebAppServer:
+      os: linux
+      services:
+        - http
+        - https
+        - tomcat
+      vulnerabilities:
+        - CVE-2021-41773
+        - CVE-2023-44487
+      sensitivity: high
+
+    WorkstationA:
+      os: windows
+      services:
+        - rdp
+        - smb
+      vulnerabilities:
+        - CVE-2021-34527
+        - CVE-2020-0796
+      sensitivity: low
+
+    WorkstationB:
+      os: windows
+      services:
+        - rdp
+        - smb
+      vulnerabilities:
+        - CVE-2017-0144
+      sensitivity: low
+
+    DatabaseServer:
+      os: linux
+      services:
+        - mysql
+        - ssh
+      vulnerabilities:
+        - CVE-2023-21912
+        - CVE-2022-21270
+        - CVE-2020-14812
+        - CVE-2019-2737
+      sensitivity: high
+
+    FileServer:
+      os: windows
+      services:
+        - smb
+        - ftp
+        - rdp
+      vulnerabilities:
+        - CVE-2020-0796
+        - CVE-2017-0144
+      sensitivity: medium
+
+    DomainController:
+      os: windows
+      services:
+        - ldap
+        - smb
+        - rdp
+        - dns
+      vulnerabilities:
+        - CVE-2020-1472
+        - CVE-2021-34527
+      sensitivity: high
+
+    BackupServer:
+      os: linux
+      services:
+        - ssh
+        - ftp
+      vulnerabilities:
+        - CVE-2022-0847
+        - CVE-2021-3156
+      sensitivity: medium
+
+    DevServer:
+      os: linux
+      services:
+        - ssh
+        - http
+        - git
+      vulnerabilities:
+        - CVE-2021-4034
+        - CVE-2016-5195
+      sensitivity: medium
+
+  edges:
+    - ["WebServer", "WebAppServer"]
+    - ["WebServer", "MailServer"]
+    - ["WebAppServer", "DatabaseServer"]
+    - ["WebAppServer", "WorkstationA"]
+    - ["MailServer", "WorkstationA"]
+    - ["MailServer", "WorkstationB"]
+    - ["WorkstationA", "FileServer"]
+    - ["WorkstationB", "FileServer"]
+    - ["FileServer", "DatabaseServer"]
+    - ["FileServer", "DomainController"]
+    - ["DomainController", "BackupServer"]
+    - ["DomainController", "DevServer"]
+    - ["DatabaseServer", "BackupServer"]

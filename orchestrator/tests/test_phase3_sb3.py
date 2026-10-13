@@ -6,9 +6,9 @@ import gymnasium as gym
 from orchestrator.rl_env_red import RedRLEnvironment
 from orchestrator.rl_env_blue import BlueRLEnvironment
 
-TOPOLOGY_2HOST = "orchestrator/sample_topology.yaml"
-TOPOLOGY_4HOST = "orchestrator/topology_4host.yaml"
-TOPOLOGY_8HOST = "orchestrator/topology_8host.yaml"
+TOPOLOGY_2HOST = "orchestrator/baselines/sample_topology.yaml"
+TOPOLOGY_4HOST = "orchestrator/baselines/topology_4host.yaml"
+TOPOLOGY_8HOST = "orchestrator/baselines/topology_8host.yaml"
 
 
 # ------------Gymnasium.Env inheritance -----------------
