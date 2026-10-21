@@ -13,145 +13,99 @@ import matplotlib.pyplot as plt
 CSV_DIR = "results/csv"
 PLOT_DIR = "results/plots"
 
+TOPOLOGIES = [
+    ("topology_4host", "4 hosts"),
+    ("topology_8host", "8 hosts"),
+    ("corporate_office_nmap", "Nmap office scan"),
+    ("topology_50host", "50 hosts"),
+]
+COLORS = {"red": "#e74c3c", "blue": "#3498db"}
 
-def load_rewards(path: str) -> list[float]:
-    rewards = []
+
+def load_selfplay(path: str) -> tuple[list[int], list[float]]:
+    rounds, rewards = [], []
     with open(path, "r") as f:
-        reader = csv.DictReader(f)
-        for row in reader:
+        for row in csv.DictReader(f):
+            rounds.append(int(row["round"]))
             rewards.append(float(row["reward"]))
-    return rewards
+    return rounds, rewards
 
 
-def smooth(data: list[float], window: int = 50) -> list[float]:
+def smooth(data: list[float], window: int = 50) -> np.ndarray:
     if len(data) < window:
-        return data
-    return np.convolve(data, np.ones(window) / window, mode="valid").tolist()
+        return np.asarray(data)
+    return np.convolve(data, np.ones(window) / window, mode="valid")
+
+
+def draw_side(ax, rounds, rewards, color, window, raw=True):
+    x = np.arange(1, len(rewards) + 1)
+    if raw:
+        ax.plot(x, rewards, alpha=0.08, color=color, linewidth=0.3)
+    # smooth each round on its own so the curve doesn't blur across opponent changes
+    for r in sorted(set(rounds)):
+        idx = [i for i, v in enumerate(rounds) if v == r]
+        s = smooth([rewards[i] for i in idx], window)
+        start = idx[0] + 1 + (len(idx) - len(s)) // 2
+        ax.plot(np.arange(start, start + len(s)), s, color=color, linewidth=1.8)
+        if r > 1:
+            ax.axvline(idx[0] + 1, color="grey", linestyle=":", linewidth=0.8)
+    ax.grid(True, alpha=0.3)
 
 
 def plot_50host():
-    red_path = f"{CSV_DIR}/maskable_ppo_red_topology_50host.csv"
-    blue_path = f"{CSV_DIR}/maskable_ppo_blue_topology_50host.csv"
-
-    if not os.path.exists(red_path) or not os.path.exists(blue_path):
-        print("[SKIP] 50-host CSVs not found")
-        return
-
-    red_r = load_rewards(red_path)
-    blue_r = load_rewards(blue_path)
-
-    window = 200
-
+    window = 300
     fig, axes = plt.subplots(1, 2, figsize=(15, 5))
-    fig.suptitle("MaskablePPO Training — 50-Host Network (251 Actions)", fontsize=14, fontweight="bold")
+    fig.suptitle("Self-play training on the 50-host network (MaskablePPO, 8 rounds)",
+                 fontsize=14, fontweight="bold")
 
-    # Red agent
-    ax = axes[0]
-    ax.plot(range(len(red_r)), red_r, alpha=0.15, color="#e74c3c", linewidth=0.4)
-    s = smooth(red_r, window)
-    ax.plot(range(len(s)), s, color="#e74c3c", linewidth=2,
-            label=f"Smoothed (window={window})")
-    ax.axhline(np.mean(red_r[-2000:]), color="#c0392b", linestyle="--", linewidth=1.2,
-               label=f"Last 20% mean: {np.mean(red_r[-2000:]):.1f}")
-    ax.set_title("Red Agent (Attacker)", fontsize=12, fontweight="bold")
-    ax.set_xlabel("Episode")
-    ax.set_ylabel("Episode Reward")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-
-    # Blue agent
-    ax = axes[1]
-    ax.plot(range(len(blue_r)), blue_r, alpha=0.15, color="#3498db", linewidth=0.4)
-    s = smooth(blue_r, window)
-    ax.plot(range(len(s)), s, color="#3498db", linewidth=2,
-            label=f"Smoothed (window={window})")
-    ax.axhline(np.mean(blue_r[-2000:]), color="#2980b9", linestyle="--", linewidth=1.2,
-               label=f"Last 20% mean: {np.mean(blue_r[-2000:]):.1f}")
-    ax.set_title("Blue Agent (Defender)", fontsize=12, fontweight="bold")
-    ax.set_xlabel("Episode")
-    ax.set_ylabel("Episode Reward")
-    ax.legend(fontsize=9)
-    ax.grid(True, alpha=0.3)
-
-    plt.tight_layout()
-    out = f"{PLOT_DIR}/maskable_ppo_training_50host.png"
-    plt.savefig(out, dpi=300, bbox_inches="tight")
-    plt.close()
-    print(f"[SAVED] {out}  (Red: {len(red_r)} eps, Blue: {len(blue_r)} eps)")
-
-
-def plot_scale_comparison():
-    # Compare Red agent reward across 4-host DQN, 8-host PPO, 50-host MaskablePPO
-    configs = [
-        ("DQN\n4-Host",  f"{CSV_DIR}/sb3_dqn_red_topology_4host.csv",  "#95a5a6"),
-        ("PPO\n8-Host",  f"{CSV_DIR}/sb3_ppo_red_topology_8host.csv",   "#e67e22"),
-        ("MaskablePPO\n50-Host", f"{CSV_DIR}/maskable_ppo_red_topology_50host.csv", "#e74c3c"),
-    ]
-
-    fig, ax = plt.subplots(figsize=(10, 5))
-    fig.suptitle("Red Agent — Scaling Comparison (DQN → PPO → MaskablePPO)", fontsize=13, fontweight="bold")
-
-    for label, path, color in configs:
+    for ax, side, title in [(axes[0], "red", "Red agent (attacker)"),
+                            (axes[1], "blue", "Blue agent (defender)")]:
+        path = f"{CSV_DIR}/selfplay_{side}_topology_50host.csv"
         if not os.path.exists(path):
             print(f"[SKIP] {path}")
             continue
-        r = load_rewards(path)
-        window = max(10, len(r) // 40)
-        s = smooth(r, window)
-        ax.plot(
-            np.linspace(0, 100, len(s)),
-            s,
-            label=label.replace("\n", " "),
-            linewidth=2,
-            color=color,
-        )
-
-    ax.set_xlabel("Training Progress (%)")
-    ax.set_ylabel("Episode Reward (smoothed)")
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
+        rounds, rewards = load_selfplay(path)
+        draw_side(ax, rounds, rewards, COLORS[side], window)
+        per_round = len(rewards) // max(rounds)
+        for r in sorted(set(rounds)):
+            ax.text((r - 0.5) * per_round, 0.97, f"R{r}", transform=ax.get_xaxis_transform(),
+                    ha="center", va="top", fontsize=8, color="grey")
+        ax.set_title(title, fontsize=12, fontweight="bold")
+        ax.set_xlabel("Episode (dotted lines = new round, stronger opponent)")
+        ax.set_ylabel("Episode reward")
 
     plt.tight_layout()
-    out = f"{PLOT_DIR}/scale_comparison_red.png"
-    plt.savefig(out, dpi=300, bbox_inches="tight")
+    out = f"{PLOT_DIR}/selfplay_training_50host.png"
+    plt.savefig(out, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[SAVED] {out}")
 
 
-def plot_blue_comparison():
-    # Blue agent: DQN 8host (known failure) vs PPO 8host vs MaskablePPO 50host
-    configs = [
-        ("DQN\n8-Host",  f"{CSV_DIR}/sb3_dqn_blue_topology_8host.csv",  "#95a5a6"),
-        ("PPO\n8-Host",  f"{CSV_DIR}/sb3_ppo_blue_topology_8host.csv",   "#3498db"),
-        ("MaskablePPO\n50-Host", f"{CSV_DIR}/maskable_ppo_blue_topology_50host.csv", "#1abc9c"),
-    ]
+def plot_all_topologies():
+    fig, axes = plt.subplots(2, len(TOPOLOGIES), figsize=(18, 7))
+    fig.suptitle("Self-play training on every shipped network (smoothed, per round)",
+                 fontsize=14, fontweight="bold")
 
-    fig, ax = plt.subplots(figsize=(10, 5))
-    fig.suptitle("Blue Agent — DQN Failure vs PPO vs MaskablePPO", fontsize=13, fontweight="bold")
-
-    for label, path, color in configs:
-        if not os.path.exists(path):
-            print(f"[SKIP] {path}")
-            continue
-        r = load_rewards(path)
-        window = max(10, len(r) // 40)
-        s = smooth(r, window)
-        ax.plot(
-            np.linspace(0, 100, len(s)),
-            s,
-            label=label.replace("\n", " "),
-            linewidth=2,
-            color=color,
-        )
-
-    ax.set_xlabel("Training Progress (%)")
-    ax.set_ylabel("Episode Reward (smoothed)")
-    ax.legend(fontsize=10)
-    ax.grid(True, alpha=0.3)
+    for col, (topo, label) in enumerate(TOPOLOGIES):
+        for row, side in enumerate(["red", "blue"]):
+            ax = axes[row][col]
+            path = f"{CSV_DIR}/selfplay_{side}_{topo}.csv"
+            if not os.path.exists(path):
+                print(f"[SKIP] {path}")
+                continue
+            rounds, rewards = load_selfplay(path)
+            window = max(20, len(rewards) // max(rounds) // 15)
+            draw_side(ax, rounds, rewards, COLORS[side], window, raw=False)
+            if row == 0:
+                ax.set_title(f"{label} ({max(rounds)} rounds)", fontsize=11, fontweight="bold")
+            if col == 0:
+                ax.set_ylabel(f"{side.capitalize()} reward")
+            if row == 1:
+                ax.set_xlabel("Episode")
 
     plt.tight_layout()
-    out = f"{PLOT_DIR}/scale_comparison_blue.png"
-    plt.savefig(out, dpi=300, bbox_inches="tight")
+    out = f"{PLOT_DIR}/selfplay_training_all.png"
+    plt.savefig(out, dpi=200, bbox_inches="tight")
     plt.close()
     print(f"[SAVED] {out}")
 
@@ -159,6 +113,4 @@ def plot_blue_comparison():
 if __name__ == "__main__":
     os.makedirs(PLOT_DIR, exist_ok=True)
     plot_50host()
-    plot_scale_comparison()
-    plot_blue_comparison()
-    print("\nDone.")
+    plot_all_topologies()
