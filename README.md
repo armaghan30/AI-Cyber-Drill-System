@@ -1,6 +1,6 @@
 # AI-Powered Cyber Drill System
 
-**Reinforcement-learning Red Team vs Blue Team cyber drills on simulated enterprise networks of up to 50 hosts.**
+**Simulation-based security assessment: a self-trained AI attacker and defender run thousands of drills on a digital twin of your network and rate its breach likelihood on the NIST SP 800-30 scale.**
 
 ![Python](https://img.shields.io/badge/Python-3.10+-3776AB?logo=python&logoColor=white)
 ![Stable-Baselines3](https://img.shields.io/badge/Stable--Baselines3-MaskablePPO-6B4C9A)
@@ -9,27 +9,38 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi&logoColor=white)
 ![React](https://img.shields.io/badge/React_18-20232A?logo=react&logoColor=61DAFB)
 ![MITRE ATT&CK](https://img.shields.io/badge/MITRE_ATT%26CK-tactic_mapping-E4002B)
-![Tests](https://img.shields.io/badge/tests-126_passing-brightgreen)
-![License](https://img.shields.io/badge/License-MIT-green)
+![NIST SP 800-30](https://img.shields.io/badge/NIST_SP_800--30-likelihood_scale-1F4E79)
+![Tests](https://img.shields.io/badge/tests-291_passing-brightgreen)
+![License](https://img.shields.io/badge/License-All_rights_reserved-lightgrey)
 
 > Final Year Project, **BS Computer Science, FAST-NUCES Lahore** (2026), supervised by **Dr. Ammar Haider**. Grade: **A**.
 
-An attacker agent (**Red**) and a defender agent (**Blue**) learn their strategies through reinforcement learning in a custom cyber range. You upload a network (YAML or an **Nmap XML scan**), and the trained agents play out a full attack-and-defence drill step by step in a web dashboard. Each drill produces analytics, the attacker's reconstructed attack path, and a downloadable **PDF security report** with CVE details, MITRE ATT&CK tactic mapping and remediation priorities.
+You upload a network (YAML or an **Nmap XML scan**). An attacker agent (**Red**) and a defender agent (**Blue**), trained against each other with reinforcement learning, then play out attack-and-defence drills on a safe simulated copy of it. Nothing touches the real network.
+
+From those drills the system answers three questions:
+
+1. **How likely is a breach?** It runs 30 drills with the network's current controls only and 30 with the AI defender, and rates each breach rate on the likelihood scale of **NIST SP 800-30 Rev. 1, Table G-4** (Very Low to Very High), with a 95% confidence range.
+2. **What should the defenders do?** An **AI Defence Playbook** built from what the trained defender actually did: what to protect first, which hosts to harden, and how it responded during attacks.
+3. **What would fixing things in advance change?** A **what-if** run applies the top 10 fixes to a copy of the network and re-runs the assessment, so you see the before and after.
+
+Every drill also produces the attacker's reconstructed path, MITRE ATT&CK tactic mapping, CVE details with CVSS scores, and a downloadable **PDF security report**.
+
+<!-- demo video link goes here -->
 
 ![Live Red vs Blue drill on a 50-host network](docs/screenshots/live_drill.png)
-*Live drill on the 50-host network: the trained agents play step by step. In step 31, Blue's firewall blocks Red's exploit attempt.*
+*Live drill on the 50-host network: both trained agents act every step. In step 31, Blue's firewall blocks Red's exploit attempt.*
 
 ---
 
 ## Highlights
 
-- **Custom Gymnasium environments** for the Red and Blue agents, built from scratch: network state, host vulnerabilities, access levels, isolation and firewall status.
-- **MaskablePPO** (Stable-Baselines3 / `sb3-contrib`) with **action masking**, so agents only choose actions that are valid in the current network state. This is what made a 50-host network (251 Red / 301 Blue actions) trainable.
-- **Iterative RL engineering:** the project progressed from DQN on 2–8 hosts, to PPO on 8 hosts, to MaskablePPO on 50 hosts. In a controlled benchmark (same network, budget and seeds), **MaskablePPO beat DQN and PPO in every setting**, by about 12× in Red reward on 50 hosts (see [How the project evolved](#how-the-project-evolved)).
-- **Security grounding:** real CVE identifiers per host (e.g. Log4Shell, PrintNightmare, EternalBlue), NIST NVD lookup with CVSS scores, MITRE ATT&CK tactic mapping for every action, a simulated firewall engine, and a segmented DMZ / internal / database network design.
-- **Nmap XML import:** convert a scan into a drill topology, review host sensitivity and links, then run it.
-- **Full-stack platform:** FastAPI backend (40 REST endpoints, per-user data, token auth) and a React dashboard with live drill playback, analytics, a network monitor and PDF report export.
-- **126 automated tests** (pytest) covering environments, agents, reward engine, topology loading, SB3 compatibility and the API.
+- **Self-play training:** Red and Blue learn against each other in alternating rounds. Each new round faces a pool of all earlier versions of the opponent, so neither side overfits to one strategy. The 50-host agents trained for 8 rounds (2 million steps each).
+- **Custom Gymnasium environments** built from scratch: host vulnerabilities, access levels, reachability (an attacker needs an internet-facing host or a foothold next to the target), isolation and firewall state.
+- **MaskablePPO** (`sb3-contrib`) with **action masking**, so agents only pick actions that are valid in the current state. This is what makes a 50-host network (251 Red / 301 Blue actions) trainable.
+- **Standards-based rating:** breach likelihood on the NIST SP 800-30 Rev. 1 scale, a clear per-drill breach rule (any data stolen, or more than 20% of hosts compromised), MITRE ATT&CK tactics for every action, and real CVE identifiers with NIST NVD lookup.
+- **Nmap XML import:** turn a scan into a drill network, review host sensitivity and links, then assess it.
+- **Full-stack platform:** FastAPI backend (44 REST endpoints, per-user data, token auth, background assessment jobs) and a React dashboard with live drill playback, analytics, a network monitor, the security report and PDF export.
+- **291 automated tests** (pytest) covering environments, masks, rewards, reachability, self-play, assessment, playbook, what-if and the API.
 
 ---
 
@@ -37,20 +48,18 @@ An attacker agent (**Red**) and a defender agent (**Blue**) learn their strategi
 
 ```mermaid
 flowchart LR
-    A[Topology<br/>YAML or Nmap XML] --> B[Orchestrator<br/>env builder, host state,<br/>firewall engine]
-    B --> C[Red Gymnasium env<br/>5n+1 actions]
-    B --> D[Blue Gymnasium env<br/>6n+1 actions]
-    C --> E[MaskablePPO<br/>Red policy]
-    D --> F[MaskablePPO<br/>Blue policy]
-    E --> G[Drill engine<br/>Red vs Blue, step by step]
-    F --> G
-    G --> H[FastAPI backend]
-    H --> I[React dashboard<br/>live drill, analytics,<br/>attack path, PDF report]
+    A[Network<br/>YAML or Nmap XML] --> B[Digital twin<br/>hosts, CVEs, links,<br/>firewall engine]
+    B --> C[Self-play training<br/>Red vs Blue, MaskablePPO]
+    C --> D[Drills<br/>trained Red vs trained Blue]
+    D --> E[Security assessment<br/>NIST likelihood, playbook,<br/>what-if hardening]
+    E --> F[FastAPI backend]
+    F --> G[React dashboard<br/>live drill, analytics,<br/>report, PDF]
 ```
 
-1. **Topology:** hosts with OS, services, CVEs and a sensitivity level (low / medium / high), plus the network links between them.
-2. **Training:** each agent learns with MaskablePPO against a scripted (rule-based) opponent: Red trains against a heuristic defender and Blue against a heuristic attacker. Models are saved per topology in `results/models/`.
-3. **Drill (neural network vs neural network):** the trained Red and Blue policies are loaded together and play against each other in real time. The dashboard streams every step, and the backend builds the attack path, host risk scores and the report. During playback the Red policy's actions are sampled with a small action-type rotation rule, so the full attack chain (scan → exploit → escalate → lateral movement → exfiltration) unfolds instead of one action repeating.
+1. **Network:** hosts with OS, services, CVEs, a sensitivity level (low / medium / high) and the links between them. Internet-facing hosts are the attacker's possible entry points.
+2. **Training:** Red and Blue are trained in rounds with self-play. Models are saved per network in `results/models/`.
+3. **Drill:** the two trained policies play against each other step by step. A drill is **BREACHED** if any data is stolen or more than 20% of hosts are compromised, otherwise **DEFENDED**.
+4. **Assessment:** many drills per mode give a breach rate, which is mapped to the NIST likelihood level and turned into the playbook and the what-if comparison.
 
 ### Action spaces
 
@@ -64,51 +73,49 @@ For a network with `n` hosts, Red has `5n + 1` actions and Blue has `6n + 1` (on
 | Lateral Move | Lateral Movement (TA0008) | Isolate / Deploy Firewall |
 | Exfiltrate | Exfiltration (TA0010) | Restore |
 
-**Action masking** removes invalid choices at every step, for example exploiting an already-compromised or isolated host, escalating without access, exfiltrating from an uncompromised host, or deploying a firewall that is already active.
+**Action masking** removes invalid choices at every step: exploiting a host that is unreachable or not yet scanned, escalating without access, exfiltrating without root, or deploying a firewall that is already active.
 
-**Rewards** are shaped by security outcomes. Red is rewarded for new compromises, privilege escalation and data exfiltration (weighted by host sensitivity). Blue is rewarded for detecting, isolating and restoring compromised hosts and for firewalls that block lateral movement. Wasted actions are penalised for both.
+**Rewards** follow security outcomes. Red earns rewards for new compromises, escalation and data theft (more for sensitive hosts). Blue earns rewards for stopping attacks and gets a large bonus or penalty at the end of each episode depending on whether the network was breached. Scanning and detecting only pay when they reveal something new.
+
+### Breach likelihood scale (NIST SP 800-30 Rev. 1, Table G-4)
+
+| Breach rate over the drills | Likelihood |
+|---:|---|
+| 96–100% | Very High |
+| 80–95% | High |
+| 21–79% | Moderate |
+| 5–20% | Low |
+| 0–4% | Very Low |
 
 ---
 
-## How the project evolved
+## Results
 
-| Stage | Algorithm | Network size | Outcome |
-|---|---|---|---|
-| 1 | Custom DQN (PyTorch) | 2–8 hosts | Prototype that showed the environment and reward design could be learned. |
-| 2 | **DQN** (Stable-Baselines3) | 2, 4, 8 hosts | Red learned well, but the **Blue agent's reward collapsed on 8 hosts** as the action space grew (curves in [`results/history/dqn/`](results/history/dqn)). |
-| 3 | **PPO** (Stable-Baselines3) | 8 hosts | Moved to the policy-gradient family because `sb3-contrib` supports invalid-action masking for PPO (there is no masked DQN). Plain PPO showed the real bottleneck: most actions in a large network are invalid, and an unmasked agent wastes its training on them. |
-| 4 | **MaskablePPO** (`sb3-contrib`) | **50 hosts** | PPO plus action masking: no invalid actions, stable across seeds, and both agents converged within about 5,000 episodes on a 50-host network with 251 / 301 actions. |
+### Security assessment on the 50-host network
 
-![Red agent: DQN to PPO to MaskablePPO](results/plots/scale_comparison_red.png)
+Each mode runs 30 drills of 15 steps. The trained attacker is the same in every mode.
 
-*Development-history curves. Each run used a different network size (4, 8 and 50 hosts), and reward grows with network size, so these curves show the progression rather than a like-for-like comparison. The controlled comparison follows.*
+| Mode | Breach rate | NIST likelihood |
+|---|---:|---|
+| Current security (network's own controls, no active defence) | 97–100% | **Very High** |
+| With AI defence (trained Blue agent) | 50–83% | **Moderate** to **High** |
+| After the top 10 what-if fixes (no active defence) | 0–10% | **Very Low** to **Low** |
 
-### Controlled comparison: DQN vs PPO vs MaskablePPO
+Ranges cover repeated assessments, since each one samples new drills. The AI defender lowers the risk during an attack, but fixing the main entry points in advance has the largest effect.
 
-To compare the algorithms fairly, all three were re-trained on **the same network** with **the same budget (50,000 steps)**, the same hyperparameters as the project's training scripts, and **3 random seeds each**. Each trained policy was then evaluated on the same 50 episodes.
+### Self-play training
 
-![DQN vs PPO vs MaskablePPO benchmark](results/plots/algorithm_benchmark.png)
+![Self-play training on the 50-host network](results/plots/selfplay_training_50host.png)
 
-**MaskablePPO came out best in all four settings, and the gap grows with network size.** On 50 hosts, its Red agent scored about 504 against 40 (DQN) and −70 (PPO), and its Blue agent scored 198 against 23 and −1.
+Within each round the learning side improves quickly. When the next round starts, it faces a stronger opponent, so its reward drops and climbs again. Over 8 rounds the attacker's reward keeps rising while the defender holds a steady level against ever stronger attackers.
 
-Security outcomes per evaluation episode (mean of 3 seeds):
+![Self-play training on every network](results/plots/selfplay_training_all.png)
 
-| Setting | Measure | DQN | PPO | MaskablePPO |
-|---|---|---:|---:|---:|
-| Red, 50 hosts | Hosts compromised by Red ↑ | 0.6 | 1.0 | **12.9** |
-| Red, 50 hosts | Invalid actions chosen ↓ | 19% | 94% | **0%** |
-| Blue, 50 hosts | Hosts compromised at end ↓ | 3.5 | 3.5 | **2.8** |
-| Red, 8 hosts | Hosts compromised by Red ↑ | 4.1 | 4.1 | **6.1** |
-| Blue, 8 hosts | Hosts compromised at end ↓ | 2.6 | 2.7 | **0.9** |
-| Blue, 8 hosts | Invalid actions chosen ↓ | 49% | 16% | **0%** |
+Trained models are included for all four networks (4 hosts, 8 hosts, a 12-host Nmap office scan and 50 hosts). On the 4-host network the defender learns to shut the only entry point, so the attacker's reward falls round after round. Reward logs are in `results/csv/`.
 
-Plain PPO scored below DQN at this budget. DQN reuses past experience from a replay buffer, so it learns more from a short run, while PPO uses each batch once and, without masking, its Red agent on 50 hosts spent 94% of its steps on actions that could not succeed. DQN, however, was unstable: its Blue agent's reward collapsed on 8 hosts in the original training runs, and its 50-host Red results varied widely between seeds (−11 to 84). Masking fixes PPO's weakness, which is why MaskablePPO leads in every setting. Rewards are only comparable within one panel, because reward scales with network size and differs between Red and Blue. Raw results are in [`results/benchmark/`](results/benchmark); reproduce with `orchestrator/benchmark_algorithms.py`.
+### Why MaskablePPO
 
-### Final 50-host training
-
-![MaskablePPO training on the 50-host network](results/plots/maskable_ppo_training_50host.png)
-
-The Red agent trained for about 75,000 episodes and the Blue agent for about 125,000. Smoothed episode reward rose from ≈230 to ≈530 for Red and from ≈115 to ≈197 for Blue, then stabilised. Per-episode logs are in `results/csv/`.
+The agents were first built with DQN and plain PPO. DQN's Blue agent collapsed on 8 hosts as the action space grew (curves in [`results/history/dqn/`](results/history/dqn)). Plain PPO showed the real bottleneck: in a large network most actions are invalid at any moment, and an unmasked agent spends most of its training on them. MaskablePPO keeps PPO's stability and removes invalid actions entirely, which made the 50-host network trainable. `orchestrator/benchmark_algorithms.py` compares the three algorithms on any network.
 
 ---
 
@@ -122,13 +129,13 @@ The Red agent trained for about 75,000 episodes and the Blue agent for about 125
 
 ![Attack path](docs/screenshots/attack_path.png)
 
-**Security report:** executive summary and per-host risk assessment, followed by the firewall engine's recommended rules and the hosts that need isolation.
+**Security report:** executive summary and per-host risk assessment, followed by the security assessment, the AI Defence Playbook, what-if hardening and the firewall engine's recommended rules.
 
 ![Security report](docs/screenshots/security_report.png)
 
 ![Firewall placement and isolation](docs/screenshots/firewall_placement.png)
 
-**PDF report** generated by the backend (ReportLab): cover, simulated firewall rules, and MITRE ATT&CK mapping with remediation priorities.
+**PDF report** generated by the backend: cover, security assessment, firewall rules and MITRE ATT&CK mapping with remediation priorities.
 
 ![PDF report pages](docs/screenshots/pdf_report_pages.png)
 
@@ -138,11 +145,11 @@ The Red agent trained for about 75,000 episodes and the Blue agent for about 125
 
 | Area | Technologies |
 |---|---|
-| Reinforcement learning | Stable-Baselines3, `sb3-contrib` (MaskablePPO), PPO, DQN, Gymnasium, PyTorch, NumPy |
-| Cybersecurity | MITRE ATT&CK (tactics), CVE data + NIST NVD API (CVSS), Nmap XML parsing, simulated firewall / network segmentation |
+| Reinforcement learning | Stable-Baselines3, `sb3-contrib` (MaskablePPO), self-play, Gymnasium, PyTorch, NumPy |
+| Cybersecurity | NIST SP 800-30 likelihood scale, MITRE ATT&CK (tactics), CVE data + NIST NVD API (CVSS), Nmap XML parsing, simulated firewall / network segmentation |
 | Backend | FastAPI, SQLAlchemy, SQLite, Pydantic, ReportLab (PDF reports) |
 | Frontend | React 18, Vite, Tailwind CSS, Recharts, React Router |
-| Testing | pytest (126 tests) |
+| Testing | pytest (291 tests) |
 
 ---
 
@@ -165,24 +172,19 @@ npm install
 npm run dev
 ```
 
-Open `http://localhost:5173`, register a user, go to **AI Orchestrator** and upload `examples/topology_50host.yaml`. Pre-trained models for this network are included, so the drill starts immediately. More example networks are described in [`examples/`](examples).
+Open `http://localhost:5173`, register a user, go to **AI Orchestrator** and upload `examples/topology_50host.yaml`. Trained models for this network are included, so drills start immediately. Then open **Security Report** and click **Run security assessment**. More example networks are described in [`examples/`](examples).
 
 For anything beyond local use, set your own token-signing key: `DRILL_SECRET_KEY=<random value>`.
 
 ### Train agents for a new network
 
-```bash
-python -m orchestrator.train_maskable_ppo_red  path/to/topology.yaml 100000
-python -m orchestrator.train_maskable_ppo_blue path/to/topology.yaml 100000
-```
-
-Models are saved as `results/models/maskable_ppo_{red|blue}_{topology}.zip` and are picked up automatically by the drill engine. Training can also be started from the web UI.
-
-### Reproduce the algorithm comparison
+Self-play training (what the included models use):
 
 ```bash
-python -m orchestrator.benchmark_algorithms examples/topology_50host.yaml red 50000 0,1,2 50
+python -m orchestrator.train_adversarial path/to/topology.yaml --mode selfplay --rounds 8 --steps 250000 --out results/selfplay/my_network
 ```
+
+Each round saves `round_N/red.zip` and `round_N/blue.zip`. Copy the last round to `results/models/maskable_ppo_{red|blue}_{topology}.zip` and the app picks them up. Quick single-agent training can also be started from the web UI.
 
 ### Run the tests
 
@@ -195,33 +197,23 @@ pytest
 ## Project structure
 
 ```
-backend/        FastAPI app: routers, services (simulation, reports, PDF, CVE lookup, training), tests
+backend/        FastAPI app: routers, services (simulation, assessment, reports, PDF, CVE lookup, training), tests
 frontend/       React + Vite dashboard (see frontend/README.md)
-orchestrator/   RL core: Gymnasium envs, env builder, reward engine, firewall engine,
-                Nmap parser, rule-based opponents, training + benchmark scripts, tests
-examples/       Example topologies (50-host enterprise, 10-host, Nmap XML)
-results/        Trained models, reward logs, training plots, benchmark results, DQN history
+orchestrator/   RL core: Gymnasium envs, env builder, action masks, reward engine, firewall engine,
+                self-play training, assessment, playbook, what-if, Nmap parser, tests
+examples/       Example networks (50-host enterprise, 10-host, Nmap XML)
+results/        Trained models, reward logs, training plots, DQN history
 docs/           Screenshots
 scripts/        Synthetic Nmap scan generator
 ```
 
 ---
 
-## Limitations and future work
+## Roadmap
 
-**Current limitations**
-- The cyber range is an **abstract simulation**: actions change modelled host state and nothing is exploited for real. Success probabilities and rewards are design choices, not measured values.
-- Agents are trained **per topology**, so a new network needs its own training run.
-- Each agent **learns** against a scripted opponent. The two trained networks compete in live drills, but they are not yet trained against each other (self-play).
-- For Nmap imports, CVEs are suggested from detected services and network links are inferred, because Nmap output contains no topology. Both should be reviewed before running a drill.
-- MITRE ATT&CK mapping is at **tactic** level, not individual techniques.
-- Authentication is a simple signed-token scheme intended for local and demo use.
-
-**Future work**
-- **Self-play:** train Red and Blue against each other's learned policies, so each adapts to an evolving opponent.
-- Policies that generalise across networks (e.g. graph neural network encoders).
-- Technique-level ATT&CK mapping and richer attacker behaviours.
-- Feeding real telemetry (SIEM logs, vulnerability scanners) into the environment.
+- Policies that generalise across networks (e.g. graph neural network encoders), so one model covers any network.
+- Partial observability: the attacker only sees what it has scanned, the defender only what it has detected.
+- Technique-level ATT&CK mapping and feeding real telemetry (SIEM logs, vulnerability scanners) into the twin.
 
 ---
 
@@ -231,4 +223,4 @@ Developed as a Final Year Project at FAST-NUCES Lahore under the supervision of 
 
 ## License
 
-[MIT](LICENSE)
+Copyright (c) 2026 Muhammad Armaghan Tariq. All rights reserved. See [LICENSE](LICENSE).
