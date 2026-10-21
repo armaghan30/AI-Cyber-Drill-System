@@ -3,6 +3,19 @@ from __future__ import annotations
 from typing import Dict, Any, Tuple
 
 
+# stealing data has to pay more than taking another host
+EXFIL_REWARD = {"low": 40.0, "medium": 80.0, "high": 120.0}
+EXFIL_PENALTY = {"low": -5.0, "medium": -10.0, "high": -15.0}
+
+# end-of-episode reward for Blue: did the network get breached?
+BLUE_OUTCOME_REWARD = 50.0
+
+
+def blue_outcome_reward(final_hosts) -> float:
+    from orchestrator.verdict import is_breach
+    return -BLUE_OUTCOME_REWARD if is_breach(final_hosts) else BLUE_OUTCOME_REWARD
+
+
 class RewardEngine:
 
     def compute_rewards(
@@ -31,17 +44,22 @@ class RewardEngine:
                 red_r -= 3.0
 
             if a_type == "scan" and target in new_hosts:
-                red_r += 1.0
-                vulns = new_hosts[target].get("vulnerabilities", [])
-                if len(vulns) > 0:
-                    red_r += 2.0
-                else:
+                if not red_action.get("new_info", True):
+                    # re-scan that learned nothing new: wasted step (stops scan farming)
                     red_r -= 1.0
+                else:
+                    red_r += 1.0
+                    vulns = new_hosts[target].get("vulnerabilities", [])
+                    if len(vulns) > 0:
+                        red_r += 2.0
+                    else:
+                        red_r -= 1.0
 
             elif a_type == "exploit" and target in new_hosts:
                 new_comp = bool(new_hosts[target].get("is_compromised", False))
                 prev_comp = bool(prev_hosts.get(target, {}).get("is_compromised", False))
                 if new_comp and not prev_comp:
+                    # intentional: +20 here and +25 below = +45 per new host (strong attacker)
                     red_r += 20.0
                 else:
                     red_r -= 5.0
@@ -61,6 +79,7 @@ class RewardEngine:
             elif a_type == "lateral_move" and target in new_hosts:
                 success = red_action.get("success", False)
                 if success:
+                    # INTENTIONAL: +18 plus the +25 global bonus = +43 per host reached laterally
                     red_r += 18.0
                     blue_r -= 8.0
                 else:
@@ -74,13 +93,11 @@ class RewardEngine:
                 success = red_action.get("success", False)
                 if success:
                     sensitivity = red_action.get("sensitivity", "low")
-                    sens_reward = {"low": 10.0, "medium": 20.0, "high": 30.0}
-                    sens_penalty = {"low": -5.0, "medium": -10.0, "high": -15.0}
-                    red_r += sens_reward.get(sensitivity, 10.0)
-                    blue_r += sens_penalty.get(sensitivity, -5.0)
+                    red_r += EXFIL_REWARD.get(sensitivity, EXFIL_REWARD["low"])
+                    blue_r += EXFIL_PENALTY.get(sensitivity, EXFIL_PENALTY["low"])
                 else:
                     reason = red_action.get("reason", "")
-                    if reason in ("no_root_access", "already_exfiltrated"):
+                    if reason in ("no_root_access", "already_exfiltrated", "host_isolated"):
                         red_r -= 2.0
                     else:
                         red_r -= 3.0
@@ -90,7 +107,7 @@ class RewardEngine:
             new_comp = bool(new_h.get("is_compromised", False))
             prev_comp = bool(prev_hosts.get(host_name, {}).get("is_compromised", False))
             if new_comp and not prev_comp:
-                red_r += 25.0
+                red_r += 25.0  # INTENTIONAL (see exploit / lateral_move above)
                 blue_r -= 6.0
 
         # ---------------------- BLUE ACTION REWARDS ----------------------
@@ -122,7 +139,10 @@ class RewardEngine:
             elif b_type == "detect" and target in new_hosts:
                 detected = blue_action.get("detected", False)
                 prev_comp = bool(prev_hosts.get(target, {}).get("is_compromised", False))
-                if detected:
+                if detected and not blue_action.get("new_detection", True):
+                    # already-known compromise, nothing new
+                    blue_r -= 1.0
+                elif detected:
                     blue_r += 12.0
                     red_r -= 2.0
                 elif prev_comp:
