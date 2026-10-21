@@ -23,8 +23,10 @@ def test_exploit_returns_action_dict(red_agent):
 def test_exploit_no_vulns_fails(environment, red_agent):
     # Remove all vulnerabilities from H1
     environment.hosts["H1"].vulnerabilities = []
+    red_agent.scan("H1")
     result = red_agent.exploit("H1")
     assert result["success"] is False
+    assert result.get("reason") is None  # failed on missing vulns, not on scan/reachability
 
 
 def test_choose_action_returns_valid_action(red_agent):

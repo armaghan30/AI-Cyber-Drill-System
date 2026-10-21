@@ -18,6 +18,10 @@ class RedAgent:
         found_vulns = list(getattr(host, "vulnerabilities", []))
         found_services = list(getattr(host, "services", []))
 
+        # New information = first scan of this host, or its vulns changed since the last scan
+        previous = self.known_vulns.get(host_name)
+        new_info = previous is None or set(previous["vulnerabilities"]) != set(found_vulns)
+
         # Update local knowledge
         self.known_vulns[host_name] = {
             "vulnerabilities": found_vulns,
@@ -31,6 +35,7 @@ class RedAgent:
             "target": host_name,
             "vulnerabilities": found_vulns,
             "services": found_services,
+            "new_info": new_info,
         }
 
     # ----------------------------EXPLOIT-----------------------------
@@ -38,6 +43,26 @@ class RedAgent:
     def exploit(self, host_name: str):
         host = self.env.hosts[host_name]
         vulns = list(getattr(host, "vulnerabilities", []))
+
+        # Red must know the target's weaknesses (scan first) and be able to reach it
+        if host_name not in self.known_vulns:
+            print(f" RED: Exploit on {host_name} skipped - host not scanned yet.")
+            return {
+                "action": "exploit",
+                "success": False,
+                "target": host_name,
+                "reason": "not_scanned",
+                "vulnerabilities": vulns,
+            }
+        if not self.env.is_reachable(host_name):
+            print(f" RED: Exploit failed - {host_name} is not exposed or adjacent to a foothold.")
+            return {
+                "action": "exploit",
+                "success": False,
+                "target": host_name,
+                "reason": "not_reachable",
+                "vulnerabilities": vulns,
+            }
 
         if not vulns:
             print(f" RED: Exploit failed on {host_name}. No vulnerabilities.")
@@ -138,18 +163,6 @@ class RedAgent:
                 "reason": "target_isolated",
             }
 
-        # Check firewall on target before attempting movement
-        fw = getattr(self.env, "firewall_engine", None)
-        if fw and fw.is_lateral_blocked(target_host_name):
-            print(f"  RED: Lateral move to {target_host_name} blocked by firewall.")
-            return {
-                "action": "lateral_move",
-                "target": target_host_name,
-                "source": None,
-                "success": False,
-                "reason": "firewall_blocked",
-            }
-
         # Finding a compromised host that is adjacent to the target
         adjacent_compromised = []
         for edge in self.env.edges:
@@ -169,7 +182,23 @@ class RedAgent:
                 "reason": "no_adjacent_compromised",
             }
 
-        source = random.choice(adjacent_compromised)
+        # Check the target's firewall per source: Red moves through any source it does not block
+        fw = getattr(self.env, "firewall_engine", None)
+        open_sources = [
+            s for s in adjacent_compromised
+            if not (fw and fw.is_lateral_blocked(target_host_name, s))
+        ]
+        if not open_sources:
+            print(f"  RED: Lateral move to {target_host_name} blocked by firewall.")
+            return {
+                "action": "lateral_move",
+                "target": target_host_name,
+                "source": random.choice(adjacent_compromised),
+                "success": False,
+                "reason": "firewall_blocked",
+            }
+
+        source = random.choice(open_sources)
         success = random.random() < 0.5
 
         if success:
@@ -199,6 +228,15 @@ class RedAgent:
                 "target": host_name,
                 "success": False,
                 "reason": "no_root_access",
+            }
+
+        if host.is_isolated:
+            print(f"  RED: Cannot exfiltrate {host_name} - host is isolated from the network.")
+            return {
+                "action": "exfiltrate",
+                "target": host_name,
+                "success": False,
+                "reason": "host_isolated",
             }
 
         if host.data_exfiltrated:

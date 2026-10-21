@@ -38,7 +38,8 @@ def test_step_exploit_compromises_host(environment):
     environment.step(red_action, blue_action)
 
     assert environment.hosts["H1"].is_compromised is True
-    assert environment.hosts["H1"].access_level == "root"
+    # exploit gives a user-level foothold; root needs escalate
+    assert environment.hosts["H1"].access_level == "user"
 
 
 def test_step_patch_removes_vulnerability(environment):

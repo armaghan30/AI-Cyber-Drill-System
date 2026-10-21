@@ -55,7 +55,7 @@ def test_step_restore_resets_host(orchestrator):
     env.step(None, {"action": "restore", "target": "H1"})
     assert host.is_compromised is False
     assert host.access_level == "none"
-    assert host.data_exfiltrated is False
+    assert host.data_exfiltrated is True  # stolen data stays stolen
     assert host.detected is False
     assert host.hardened_level == 2  # hardening is permanent
 

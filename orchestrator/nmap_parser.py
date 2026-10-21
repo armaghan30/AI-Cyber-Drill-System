@@ -29,6 +29,14 @@ SERVICE_CVE_MAP = {
 
 _HIGH_SERVICES  = {'mysql', 'ms-sql-s', 'postgresql', 'oracle', 'ldap'}
 _MED_SERVICES   = {'http', 'https', 'smtp', 'ftp', 'nfs', 'smb', 'microsoft-ds', 'imap', 'pop3'}
+# services a host offers to the internet (web, mail, DNS, FTP)
+_PUBLIC_SERVICES = {'http', 'https', 'http-proxy', 'http-alt', 'smtp', 'smtps', 'submission',
+                    'imap', 'imaps', 'pop3', 'pop3s', 'dns', 'domain', 'ftp', 'ftps'}
+
+
+def _suggest_exposed(services: list, sensitivity: str) -> bool:
+    """Hosts offering public services count as internet-facing, unless high sensitivity."""
+    return sensitivity != 'high' and bool(set(services) & _PUBLIC_SERVICES)
 
 
 def _detect_os(host_elem: ET.Element) -> str:
@@ -238,6 +246,12 @@ class NmapParser:
             }
 
         edges = _generate_edges(host_keys, final_sens)
+
+        # if no host looks internet-facing, leave it to the default rule
+        exposed = {h['key']: _suggest_exposed(h['services'], final_sens[h['key']]) for h in self.hosts}
+        if any(exposed.values()):
+            for key, value in exposed.items():
+                hosts_dict[key]['exposed'] = value
 
         return {
             'network': {

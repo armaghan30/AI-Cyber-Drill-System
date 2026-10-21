@@ -60,8 +60,11 @@ class FirewallEngine:
             else:
                 block_inbound = ["__none__"]        # sentinel: no sources blocked
 
+            # internet-facing hosts must keep their public services open
+            block_services = [] if getattr(host, "exposed", False) else services
+
             self.rules[host_name] = FirewallRule(
-                block_services=services,
+                block_services=block_services,
                 block_inbound_from=block_inbound,
             )
 
@@ -115,7 +118,7 @@ class FirewallEngine:
         self, target_host: str, source_host: str = None
     ) -> bool:
         """
-        Return True if lateral movement to *target_host* is blocked.
+        Return True if lateral movement from *source_host* to *target_host* is blocked.
 
         An active firewall always blocks lateral movement unless
         ``block_inbound_from`` is set and *source_host* is not in it.
@@ -124,8 +127,8 @@ class FirewallEngine:
         if not rule or not rule.active:
             return False
         if rule.block_inbound_from:
-            # Only block if the specific source is listed
-            return (source_host in rule.block_inbound_from) if source_host else True
+            # Only block if the specific source is listed (the "__none__" sentinel lists nobody)
+            return source_host in rule.block_inbound_from
         # Active firewall with no source restrictions blocks all lateral movement
         return True
 

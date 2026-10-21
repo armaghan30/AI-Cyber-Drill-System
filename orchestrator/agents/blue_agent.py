@@ -65,6 +65,7 @@ class BlueAgent:
     def make_detect_action(self, host_name: str):
         host = self.env.hosts[host_name]
         detected = False
+        already_detected = host.detected
 
         if host.is_compromised:
             if random.random() < 0.85:
@@ -81,6 +82,8 @@ class BlueAgent:
             "action": "detect",
             "target": host_name,
             "detected": detected,
+            # only a compromise Blue did not already know about is new information
+            "new_detection": detected and not already_detected,
         }
 
     def make_harden_action(self, host_name: str):

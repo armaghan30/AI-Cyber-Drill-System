@@ -5,12 +5,13 @@ from orchestrator.firewall_engine import FirewallEngine
 
 
 class Host:
-    def __init__(self, name, os, services, vulnerabilities, sensitivity):
+    def __init__(self, name, os, services, vulnerabilities, sensitivity, exposed=False):
         self.name = name
         self.os = os
         self.services = list(services)
         self.vulnerabilities = list(vulnerabilities)  # list of CVE strings
         self.sensitivity = sensitivity
+        self.exposed = exposed  # internet-facing: Red can attack it without a foothold
 
         self.is_compromised = False
         self.access_level = "none"
@@ -69,7 +70,11 @@ class Environment:
             )
             self.hosts[host_name] = host_obj
 
+        self._set_exposure(network["hosts"])
+
         self.edges = list(network.get("edges", []))
+        # original links, so restore can reconnect a host that was isolated
+        self.base_edges = list(self.edges)
 
         # Build firewall engine — works for any topology size (2–50+ hosts)
         self.firewall_engine = FirewallEngine()
@@ -82,8 +87,37 @@ class Environment:
         # generates sensible defaults for all hosts automatically.
         self.firewall_engine.auto_generate_rules(self.hosts)
 
+        for host_name, details in network["hosts"].items():
+            if details.get("firewall_active"):
+                self.firewall_engine.deploy(host_name, 0)
+                self.hosts[host_name].firewall_active = True
+
+    def _set_exposure(self, host_cfgs):
+        """Mark internet-facing hosts (YAML `exposed`, else the low-sensitivity tier)."""
+        if any("exposed" in cfg for cfg in host_cfgs.values()):
+            for name, cfg in host_cfgs.items():
+                self.hosts[name].exposed = bool(cfg.get("exposed", False))
+            return
+        low = [h for h in self.hosts.values() if h.sensitivity == "low"]
+        for h in (low or self.hosts.values()):
+            h.exposed = True
+
+    def is_reachable(self, host_name):
+        """Exposed, or linked to a host Red already controls; never when isolated."""
+        host = self.hosts[host_name]
+        if host.is_isolated:
+            return False
+        if host.exposed:
+            return True
+        for e in self.edges:
+            if host_name in e:
+                other = e[0] if e[1] == host_name else e[1]
+                if other in self.hosts and self.hosts[other].is_compromised:
+                    return True
+        return False
+
     # ------------------Reset--------------------------------
-    
+
     def reset(self):
         
         self.hosts = {}
@@ -106,7 +140,8 @@ class Environment:
             if r_type == "exploit" and target in self.hosts and success:
                 host = self.hosts[target]
                 host.is_compromised = True
-                host.access_level = "root"
+                # initial foothold is user-level; Red must escalate to root before exfiltrating
+                host.access_level = "user"
                 if host.vulnerabilities:
                     host.vulnerabilities = host.vulnerabilities[1:]
 
@@ -142,8 +177,11 @@ class Environment:
                 host = self.hosts[target]
                 host.is_compromised = False
                 host.access_level = "none"
-                host.data_exfiltrated = False
                 host.detected = False
+                # data_exfiltrated stays True: restoring a host cannot un-steal its data
+                if host.is_isolated:
+                    host.is_isolated = False
+                    self._reconnect(target)
 
             elif b_type == "detect" and target in self.hosts:
                 pass
@@ -167,6 +205,17 @@ class Environment:
 
         # 4. Return environment snapshot
         return self._snapshot()
+
+    def _reconnect(self, host_name):
+        """Bring back the original links of a restored host, except to hosts still isolated."""
+        current = {frozenset(e) for e in self.edges}
+        for e in self.base_edges:
+            if host_name not in e or frozenset(e) in current:
+                continue
+            other = e[0] if e[1] == host_name else e[1]
+            if other in self.hosts and not self.hosts[other].is_isolated:
+                self.edges.append(e)
+                current.add(frozenset(e))
 
     # ---------------------Snapshot (used by Orchestrator, RL, RewardEngine)-------
 
