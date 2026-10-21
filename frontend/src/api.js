@@ -129,11 +129,12 @@ const api = {
   stopSimulation: (sessionId) =>
     apiFetch(`/simulations/${sessionId}/stop`, { method: 'POST' }),
 
-  // Posture comparison
-  postureComparison: (scenarioId, trials = 10, maxSteps = 15) =>
-    apiFetch(`/simulations/posture-comparison?scenario_id=${scenarioId}&trials=${trials}&max_steps=${maxSteps}`, {
-      method: 'POST',
-    }),
+
+  // Security assessment
+  startAssessment: (scenarioId, drills = 30, steps = 15) =>
+    apiFetch('/assessments/', { method: 'POST', body: JSON.stringify({ scenario_id: scenarioId, drills, steps }) }),
+  getAssessment: (id) => apiFetch(`/assessments/${id}`),
+  listAssessments: (scenarioId) => apiFetch(`/assessments/?scenario_id=${scenarioId}`),
 
   // Training
   startTraining: (payload) =>

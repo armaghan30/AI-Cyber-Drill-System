@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import {
-  FaShieldAlt, FaExclamationTriangle, FaBug, FaNetworkWired,
+  FaShieldAlt, FaExclamationTriangle, FaNetworkWired,
   FaServer, FaLock, FaFileDownload, FaArrowLeft, FaBrain,
   FaCheckCircle, FaTimesCircle, FaInfoCircle,
   FaWrench, FaChartLine
 } from 'react-icons/fa'
 import api from '../api'
+import { AssessmentPanel, PlaybookPanel, WhatIfPanel, useAssessment } from '../components/SecurityAssessment'
+import { buildAssessmentSections, assessmentSummaryLine, REPORT_CSS } from './reportSections'
 
 const font = { fontFamily: 'Gugi, sans-serif' }
 
@@ -72,6 +74,8 @@ const Report = () => {
   const [attackPath, setAttackPath] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cveExtras, setCveExtras] = useState({}) // NVD-fetched data for CVEs not in local dict
+  const assessmentState = useAssessment(selectedScenario?.id)
+  const assessment = assessmentState.assessment
 
   useEffect(() => { loadData() }, [])
 
@@ -176,7 +180,9 @@ const Report = () => {
   // card was showing 0/0 even though the sim had real rewards.
   const totalRedReward  = (latestSim?.total_red_reward  ?? simSteps.reduce((s, st) => s + (st.red_reward  || 0), 0))
   const totalBlueReward = (latestSim?.total_blue_reward ?? simSteps.reduce((s, st) => s + (st.blue_reward || 0), 0))
-  const blueWon = totalBlueReward >= totalRedReward
+  const defended = latestSim?.outcome === 'defended'
+  const outcomeReason = latestSim?.reason || ''
+  const outcomeText = latestSim?.outcome ? latestSim.outcome.toUpperCase() : 'NOT TESTED'
 
   const generatePrintableReport = () => {
     const reportDate = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
@@ -187,12 +193,12 @@ const Report = () => {
       const riskLabel = risk >= 70 ? 'CRITICAL' : risk >= 40 ? 'HIGH' : risk >= 20 ? 'MEDIUM' : 'LOW'
       const badgeClass = risk >= 70 ? 'badge-critical' : risk >= 40 ? 'badge-high' : risk >= 20 ? 'badge-medium' : 'badge-low'
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600">${h.name}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${h.os || 'Unknown'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-size:12px">${(h.services || []).join(', ') || 'None'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:center">${(h.vulnerabilities || []).length}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-transform:capitalize">${h.sensitivity || 'normal'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:center"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${riskLabel} (${risk}%)</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600">${h.name}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${h.os || 'Unknown'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${(h.services || []).join(', ') || 'None'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${(h.vulnerabilities || []).length}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-transform:capitalize">${h.sensitivity || 'normal'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${riskLabel} (${risk}%)</span></td>
       </tr>`
     }).join('')
 
@@ -200,11 +206,11 @@ const Report = () => {
       const sev = c.severity || 'HIGH'
       const badgeClass = sev === 'CRITICAL' ? 'badge-critical' : sev === 'HIGH' ? 'badge-high' : sev === 'MEDIUM' ? 'badge-medium' : 'badge-low'
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;font-family:monospace">${c.id}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${c.name || 'Unknown CVE'}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${sev}</span></td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${c.host}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-size:12px">${c.fix || c.desc || 'Apply vendor security patch'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:monospace">${c.id}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${c.name || 'Unknown CVE'}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${sev}</span></td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${c.host}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.fix || c.desc || 'Apply vendor security patch'}</td>
       </tr>`
     }).join('')
 
@@ -232,20 +238,20 @@ const Report = () => {
         const sev = c.severity || 'HIGH'
         const badgeClass = sev === 'CRITICAL' ? 'badge-critical' : sev === 'HIGH' ? 'badge-high' : 'badge-medium'
         return `<tr>
-          <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:center">${i + 1}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;font-family:monospace">${c.id}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #dee2e6"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${sev}</span></td>
-          <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${c.host}</td>
-          <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-size:12px">${c.fix || 'Apply vendor patch immediately'}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${i + 1}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;font-family:monospace">${c.id}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb"><span class="${badgeClass}" style="display:inline-block;padding:2px 10px;font-size:11px;font-weight:700;border-radius:3px">${sev}</span></td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${c.host}</td>
+          <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${c.fix || 'Apply vendor patch immediately'}</td>
         </tr>`
       }).join('')
 
     const mitreRows = Object.entries(COUNTER_MAP).map(([red, info]) =>
       `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;text-transform:capitalize;color:#c0392b">${red.replace('_', ' ')}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${info.mitre}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-weight:600;color:#2980b9">${info.blue}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;font-size:12px">${info.fix}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;text-transform:capitalize;color:#b91c1c">${red.replace('_', ' ')}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${info.mitre}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-weight:600;color:#1d4ed8">${info.blue}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;font-size:12px">${info.fix}</td>
       </tr>`
     ).join('')
 
@@ -270,20 +276,19 @@ const Report = () => {
       const rt = s.red_action?.target || '-'
       const bt = s.blue_action?.target || '-'
       return `<tr>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:center">${s.step_number}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;color:#c0392b;font-weight:600;text-transform:capitalize">${ra.replace('_',' ')}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${rt}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:right;font-family:monospace">${(s.red_reward||0).toFixed(2)}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;color:#2980b9;font-weight:600;text-transform:capitalize">${ba.replace('_',' ')}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6">${bt}</td>
-        <td style="padding:8px 12px;border-bottom:1px solid #dee2e6;text-align:right;font-family:monospace">${(s.blue_reward||0).toFixed(2)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:center">${s.step_number}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#b91c1c;font-weight:600;text-transform:capitalize">${ra.replace('_',' ')}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${rt}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace">${(s.red_reward||0).toFixed(2)}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;color:#1d4ed8;font-weight:600;text-transform:capitalize">${ba.replace('_',' ')}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb">${bt}</td>
+        <td style="padding:8px 12px;border-bottom:1px solid #e5e7eb;text-align:right;font-family:monospace">${(s.blue_reward||0).toFixed(2)}</td>
       </tr>`
     }).join('')
 
     // Attack path for PDF
     const ap = attackPath
     const attackPathSection = ap && ap.entry_point ? `
-<h3>3.2 Red Agent Attack Path</h3>
 <p>The following shows the complete pathway the Red agent took through the network during this simulation.</p>
 
 <table style="margin-bottom:12px">
@@ -325,57 +330,20 @@ ${ap.lateral_movements.length > 0 ? `
 
     const html = `<!DOCTYPE html>
 <html><head><meta charset="utf-8"><title>AI-Powered Cyber Drill — Security Assessment Report — ${selectedScenario?.name || 'Network'}</title>
-<style>
-  * { margin:0; padding:0; box-sizing:border-box; }
-  body { font-family:Georgia,'Times New Roman',serif; background:#fff; color:#222; padding:60px 70px; line-height:1.7; font-size:14px; }
-  @media print {
-    body { padding:40px 50px; }
-    .no-print { display:none !important; }
-    .page-break { page-break-before:always; }
-  }
-  h1 { font-size:28px; font-weight:700; color:#1a1a1a; margin:0; }
-  h2 { font-size:18px; font-weight:700; color:#1a1a1a; margin:36px 0 12px; padding-bottom:6px; border-bottom:2px solid #1a1a1a; text-transform:uppercase; letter-spacing:1px; }
-  h3 { font-size:15px; font-weight:700; color:#333; margin:20px 0 8px; }
-  p { margin:8px 0; }
-  table { width:100%; border-collapse:collapse; margin:12px 0; font-size:13px; }
-  th { background:#f4f4f4; color:#1a1a1a; padding:10px 12px; text-align:left; border-bottom:2px solid #333; font-size:12px; text-transform:uppercase; letter-spacing:0.5px; font-family:Arial,Helvetica,sans-serif; }
-  td { padding:8px 12px; border-bottom:1px solid #dee2e6; vertical-align:top; }
-  .cover { text-align:center; padding:80px 0 60px; border-bottom:3px solid #1a1a1a; margin-bottom:40px; }
-  .cover h1 { font-size:36px; margin-bottom:8px; }
-  .cover .subtitle { font-size:16px; color:#555; margin-bottom:30px; }
-  .cover .meta { font-size:13px; color:#666; line-height:2; }
-  .cover .meta strong { color:#333; }
-  .badge { display:inline-block; padding:2px 10px; font-size:11px; font-weight:700; font-family:Arial,sans-serif; border-radius:3px; text-transform:uppercase; }
-  .badge-critical { background:#fde8e8; color:#c0392b; border:1px solid #e6b0aa; }
-  .badge-high { background:#fef5e7; color:#e67e22; border:1px solid #f5cba7; }
-  .badge-medium { background:#eaf2f8; color:#2980b9; border:1px solid #aed6f1; }
-  .badge-low { background:#eafaf1; color:#27ae60; border:1px solid #a9dfbf; }
-  .finding-box { border:1px solid #ddd; padding:16px; margin:12px 0; background:#fafafa; }
-  .finding-box.critical { border-left:4px solid #c0392b; }
-  .finding-box.high { border-left:4px solid #e67e22; }
-  .risk-bar { display:inline-block; height:14px; border-radius:2px; }
-  ul { padding-left:24px; margin:8px 0; }
-  li { margin-bottom:4px; }
-  .two-col { display:flex; gap:40px; }
-  .two-col > div { flex:1; }
-  .toc { margin:20px 0 40px; }
-  .toc a { color:#2c3e50; text-decoration:none; }
-  .toc li { margin-bottom:6px; font-size:14px; }
-  .footer { margin-top:50px; padding-top:16px; border-top:2px solid #1a1a1a; text-align:center; color:#888; font-size:11px; font-family:Arial,sans-serif; }
-  .stamp { display:inline-block; border:3px solid #c0392b; color:#c0392b; padding:6px 20px; font-size:14px; font-weight:700; font-family:Arial,sans-serif; text-transform:uppercase; letter-spacing:2px; transform:rotate(-5deg); margin-top:20px; }
-</style></head><body>
+<link href="https://fonts.googleapis.com/css2?family=Gugi&display=swap" rel="stylesheet">
+<style>${REPORT_CSS}</style></head><body>
 
 <!-- COVER PAGE -->
 <div class="cover">
-  <h1>AI-Powered Cyber Drill</h1>
-  <p class="subtitle">Security Assessment Report &mdash; Red vs Blue Adversarial Reinforcement Learning</p>
-  <div style="margin:24px 0"><span class="stamp">${blueWon ? 'DEFENDED' : 'BREACHED'}</span></div>
+  <div class="brand">CyberDrill</div>
+  <p class="subtitle">Security Assessment Report &mdash; ${selectedScenario?.name || 'Network'}</p>
+  ${assessment?.result ? `<span class="outcome ${assessment.result.modes.current_security.breach_rate > 20 ? 'breached' : 'defended'}">BREACH LIKELIHOOD: ${assessment.result.modes.current_security.nist.level.toUpperCase()}</span>` : `<span class="outcome ${latestSim?.outcome || 'none'}">LATEST DRILL: ${outcomeText}</span>`}
   <div class="meta">
     <strong>Target Network:</strong> ${selectedScenario?.name || 'Unknown Topology'}<br>
     <strong>Assessment Date:</strong> ${reportDate}<br>
     <strong>Report Generated:</strong> ${reportTime}<br>
     <strong>Scope:</strong> ${hosts.length} Hosts | ${edges.length} Network Links | ${allCVEs.length} Vulnerabilities<br>
-    <strong>Methodology:</strong> SB3 MaskablePPO Reinforcement Learning (Red/Blue Agents) aligned with MITRE ATT&CK<br>
+    <strong>Methodology:</strong> Simulated Red vs Blue drills with trained MaskablePPO agents, mapped to MITRE ATT&CK; likelihood rated with NIST SP 800-30<br>
     <strong>Classification:</strong> CONFIDENTIAL
   </div>
 </div>
@@ -384,9 +352,11 @@ ${ap.lateral_movements.length > 0 ? `
 <h2>Table of Contents</h2>
 <ol class="toc">
   <li><a href="#exec">Executive Summary</a></li>
+  <li><a href="#assessment">Security Assessment</a></li>
+  <li><a href="#playbook">AI Defence Playbook</a></li>
+  <li><a href="#whatif">What-if Hardening</a></li>
   <li><a href="#scope">Scope &amp; Methodology</a></li>
-  <li><a href="#sim">Simulation Results</a></li>
-  <li><a href="#attackpath">Red Agent Attack Path</a></li>
+  <li><a href="#sim">Latest Drill Results</a></li>
   <li><a href="#hosts">Host Risk Assessment</a></li>
   <li><a href="#vulns">Vulnerability Findings</a></li>
   <li><a href="#patch">Patching Priority</a></li>
@@ -400,11 +370,12 @@ ${ap.lateral_movements.length > 0 ? `
 
 <!-- 1. EXECUTIVE SUMMARY -->
 <h2 id="exec">1. Executive Summary</h2>
-<p>This report documents the findings of an automated penetration test conducted against the <strong>${selectedScenario?.name || 'target'}</strong> network topology. The assessment utilized AI-driven adversarial agents trained via Stable Baselines3 MaskablePPO (Masked Proximal Policy Optimization) reinforcement learning to simulate realistic attack and defense scenarios.</p>
+<p>This report documents a simulation-based security assessment of the <strong>${selectedScenario?.name || 'target'}</strong> network. A digital copy of the network was attacked by a trained Red agent and defended by a trained Blue agent (Stable Baselines3 MaskablePPO), without touching the real systems.</p>
+${assessment?.result ? `<div class="note"><strong>${assessmentSummaryLine(assessment.result)}</strong></div>` : ''}
 
 <p>The target environment consists of <strong>${hosts.length} hosts</strong> connected via <strong>${edges.length} network links</strong>. A total of <strong>${allCVEs.length} vulnerabilities</strong> were identified across the infrastructure, of which <strong>${criticalCount} are rated CRITICAL</strong> and <strong>${highCount} are rated HIGH</strong>.</p>
 
-${latestSim ? `<p>The automated Red vs Blue simulation ran for <strong>${simSteps.length} steps</strong>. The Red (attacker) agent accumulated a total reward of <strong>${totalRedReward.toFixed(2)}</strong>, while the Blue (defender) agent scored <strong>${totalBlueReward.toFixed(2)}</strong>. <strong>Overall assessment: ${blueWon ? 'Defense held — the Blue agent successfully contained the attack.' : 'Network compromised — the Red agent overcame defensive measures.'}</strong></p>` : '<p><em>No simulation has been executed yet. Results will appear here after running a drill from the AI Orchestrator.</em></p>'}
+${latestSim ? `<p>The automated Red vs Blue drill ran for <strong>${simSteps.length} steps</strong>. <strong>Outcome: ${outcomeText}${outcomeReason ? ` (${outcomeReason})` : ''}.</strong> A drill counts as breached when data is exfiltrated or more than 20% of hosts are compromised at the end. Training rewards (used only to train the agents, not a security score): Red ${totalRedReward.toFixed(1)}, Blue ${totalBlueReward.toFixed(1)}.</p>` : '<p><em>No simulation has been executed yet. Results will appear here after running a drill from the AI Orchestrator.</em></p>'}
 
 <div style="margin:20px 0">
   <table>
@@ -412,17 +383,22 @@ ${latestSim ? `<p>The automated Red vs Blue simulation ran for <strong>${simStep
     <tr><td><strong>Total Hosts</strong></td><td>${hosts.length}</td></tr>
     <tr><td><strong>Network Links</strong></td><td>${edges.length}</td></tr>
     <tr><td><strong>Total Vulnerabilities</strong></td><td>${allCVEs.length}</td></tr>
-    <tr><td><strong>Critical Severity</strong></td><td style="color:#c0392b;font-weight:700">${criticalCount}</td></tr>
-    <tr><td><strong>High Severity</strong></td><td style="color:#e67e22;font-weight:700">${highCount}</td></tr>
-    <tr><td><strong>Simulation Outcome</strong></td><td style="font-weight:700">${latestSim ? (blueWon ? 'DEFENDED' : 'BREACHED') : 'N/A'}</td></tr>
+    <tr><td><strong>Critical Severity</strong></td><td style="color:#b91c1c;font-weight:700">${criticalCount}</td></tr>
+    <tr><td><strong>High Severity</strong></td><td style="color:#c2410c;font-weight:700">${highCount}</td></tr>
+    <tr><td><strong>Simulation Outcome</strong></td><td style="font-weight:700">${latestSim ? outcomeText : 'N/A'}</td></tr>
   </table>
 </div>
 
-<!-- 2. SCOPE & METHODOLOGY -->
-<h2 id="scope">2. Scope &amp; Methodology</h2>
+<!-- 2-4. SECURITY ASSESSMENT -->
+${buildAssessmentSections(assessment)}
+
+<div class="page-break"></div>
+
+<!-- 5. SCOPE & METHODOLOGY -->
+<h2 id="scope">5. Scope &amp; Methodology</h2>
 <p>The assessment targeted a network topology defined in YAML format and uploaded to the CyberDrill platform. The testing methodology combines automated vulnerability analysis with adversarial reinforcement learning simulation.</p>
 
-<h3>2.1 Testing Approach</h3>
+<h3>5.1 Testing Approach</h3>
 <ul>
   <li><strong>Topology Parsing:</strong> Network hosts, services, vulnerabilities (CVEs), and inter-host connectivity were extracted from the uploaded YAML topology file.</li>
   <li><strong>Agent Training:</strong> Two SB3 MaskablePPO agents were trained — a Red agent (attacker) learning to exploit vulnerabilities and a Blue agent (defender) learning to counter attacks.</li>
@@ -430,7 +406,7 @@ ${latestSim ? `<p>The automated Red vs Blue simulation ran for <strong>${simStep
   <li><strong>MITRE ATT&CK Alignment:</strong> All attack and defense actions are mapped to MITRE ATT&CK tactics (Discovery, Initial Access, Privilege Escalation, Lateral Movement, Exfiltration).</li>
 </ul>
 
-<h3>2.2 Action Space</h3>
+<h3>5.2 Action Space</h3>
 <table>
   <tr><th>Red Agent (Attacker)</th><th>MITRE Tactic</th><th>Blue Agent (Defender)</th></tr>
   <tr><td>Scan</td><td>TA0007 — Discovery</td><td>Detect</td></tr>
@@ -438,30 +414,31 @@ ${latestSim ? `<p>The automated Red vs Blue simulation ran for <strong>${simStep
   <tr><td>Escalate</td><td>TA0004 — Privilege Escalation</td><td>Harden</td></tr>
   <tr><td>Lateral Move</td><td>TA0008 — Lateral Movement</td><td>Isolate</td></tr>
   <tr><td>Exfiltrate</td><td>TA0010 — Exfiltration</td><td>Restore</td></tr>
+  <tr><td>&mdash;</td><td>&mdash;</td><td>Deploy firewall</td></tr>
 </table>
 
 <div class="page-break"></div>
 
-<!-- 3. SIMULATION RESULTS -->
-<h2 id="sim">3. Simulation Results</h2>
+<!-- 6. SIMULATION RESULTS -->
+<h2 id="sim">6. Latest Drill Results</h2>
 ${latestSim ? `
 <p>The adversarial simulation completed <strong>${simSteps.length} steps</strong>. Below is the summary of agent performance and the step-by-step action log.</p>
 
 <table>
   <tr><th>Parameter</th><th>Value</th></tr>
   <tr><td>Total Steps</td><td>${simSteps.length}</td></tr>
-  <tr><td>Red Agent Total Reward</td><td>${totalRedReward.toFixed(2)}</td></tr>
-  <tr><td>Blue Agent Total Reward</td><td>${totalBlueReward.toFixed(2)}</td></tr>
-  <tr><td>Outcome</td><td><strong>${blueWon ? 'DEFENDED' : 'BREACHED'}</strong></td></tr>
+  <tr><td>Outcome</td><td><strong>${outcomeText}</strong>${outcomeReason ? ` &mdash; ${outcomeReason}` : ''}</td></tr>
+  <tr><td>Red training reward</td><td>${totalRedReward.toFixed(2)}</td></tr>
+  <tr><td>Blue training reward</td><td>${totalBlueReward.toFixed(2)}</td></tr>
 </table>
 
 ${simSteps.length > 0 ? `
-<h3>3.1 Step-by-Step Action Log</h3>
+<h3>6.1 Step-by-Step Action Log</h3>
 <table>
   <thead><tr>
     <th style="width:50px">Step</th>
-    <th style="color:#c0392b">Red Action</th><th>Target</th><th style="text-align:right">Reward</th>
-    <th style="color:#2980b9">Blue Action</th><th>Target</th><th style="text-align:right">Reward</th>
+    <th style="color:#b91c1c">Red Action</th><th>Target</th><th style="text-align:right">Training reward</th>
+    <th style="color:#1d4ed8">Blue Action</th><th>Target</th><th style="text-align:right">Training reward</th>
   </tr></thead>
   <tbody>${stepsTable}</tbody>
 </table>
@@ -471,21 +448,21 @@ ${simSteps.length > 0 ? `
 <div class="page-break"></div>
 
 <!-- ATTACK PATH -->
-<h2 id="attackpath">3.5 Red Agent Attack Path</h2>
+<h3 id="attackpath">6.2 Red Agent Attack Path</h3>
 ${attackPathSection}
 
 <div class="page-break"></div>
 
-<!-- 4. HOST RISK ASSESSMENT -->
-<h2 id="hosts">4. Host Risk Assessment</h2>
+<!-- 7. HOST RISK ASSESSMENT -->
+<h2 id="hosts">7. Host Risk Assessment</h2>
 <p>Each host was assessed based on the number and severity of known vulnerabilities, exposed services, and data sensitivity classification.</p>
 <table>
   <thead><tr><th>Host</th><th>Operating System</th><th>Services</th><th>CVEs</th><th>Sensitivity</th><th>Risk Score</th></tr></thead>
   <tbody>${hostRows}</tbody>
 </table>
 
-<!-- 5. VULNERABILITY FINDINGS -->
-<h2 id="vulns">5. Vulnerability Findings</h2>
+<!-- 8. VULNERABILITY FINDINGS -->
+<h2 id="vulns">8. Vulnerability Findings</h2>
 <p>The following vulnerabilities were identified across the target infrastructure. Each finding includes the CVE identifier, severity rating, affected host, and recommended remediation.</p>
 <table>
   <thead><tr><th>CVE ID</th><th>Name</th><th>Severity</th><th>Affected Host</th><th>Remediation</th></tr></thead>
@@ -494,32 +471,32 @@ ${attackPathSection}
 
 <div class="page-break"></div>
 
-<!-- 6. PATCHING PRIORITY -->
-<h2 id="patch">6. Patching Priority</h2>
+<!-- 9. PATCHING PRIORITY -->
+<h2 id="patch">9. Patching Priority</h2>
 <p>Vulnerabilities are listed below in descending order of severity. CRITICAL findings should be addressed within 24 hours; HIGH findings within 7 days.</p>
 <table>
   <thead><tr><th>#</th><th>CVE ID</th><th>Severity</th><th>Host</th><th>Required Action</th></tr></thead>
   <tbody>${patchPriority}</tbody>
 </table>
 
-<!-- 7. MITRE ATT&CK MAPPING -->
-<h2 id="mitre">7. MITRE ATT&CK Counter-Action Mapping</h2>
+<!-- 10. MITRE ATT&CK MAPPING -->
+<h2 id="mitre">10. MITRE ATT&CK Counter-Action Mapping</h2>
 <p>The table below maps each Red agent attack technique to the corresponding MITRE ATT&CK tactic and the recommended Blue agent defensive response.</p>
 <table>
   <thead><tr><th>Attack Technique</th><th>MITRE ATT&CK Tactic</th><th>Defensive Counter</th><th>Recommended Implementation</th></tr></thead>
   <tbody>${mitreRows}</tbody>
 </table>
 
-<!-- 8. NETWORK SECURITY -->
-<h2 id="network">8. Network Security Recommendations</h2>
+<!-- 11. NETWORK SECURITY -->
+<h2 id="network">11. Network Security Recommendations</h2>
 
-<h3>8.1 Firewall Placement</h3>
+<h3>11.1 Firewall Placement</h3>
 ${firewallRecs ? `<p>The following network connections involve high-risk hosts and require firewall rules or network segmentation:</p><ul>${firewallRecs}</ul>` : '<p>No high-risk connections requiring immediate firewall deployment were identified.</p>'}
 
-<h3>8.2 Host Isolation</h3>
+<h3>11.2 Host Isolation</h3>
 ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and should be immediately isolated from the production network:</p><ul>${isolationRecs}</ul>` : '<p>No hosts require immediate network isolation. All hosts are within acceptable risk parameters.</p>'}
 
-<h3>8.3 Network Segmentation Guidelines</h3>
+<h3>11.3 Network Segmentation Guidelines</h3>
 <ul>
   <li>Deploy next-generation firewalls between segments with different sensitivity classifications</li>
   <li>Implement micro-segmentation to contain lateral movement</li>
@@ -530,30 +507,30 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
 
 <div class="page-break"></div>
 
-<!-- 9. SERVICE HARDENING -->
-<h2 id="services">9. Service Hardening Recommendations</h2>
+<!-- 12. SERVICE HARDENING -->
+<h2 id="services">12. Service Hardening Recommendations</h2>
 <p>The following services were identified as exposed on target hosts. Each service should be hardened according to the guidelines below:</p>
 <ul>${serviceHardening || '<li>No exposed services detected.</li>'}</ul>
 
-<!-- 10. REMEDIATION PLAN -->
-<h2 id="remediation">10. Remediation Plan</h2>
+<!-- 13. REMEDIATION PLAN -->
+<h2 id="remediation">13. Remediation Plan</h2>
 
-<h3>10.1 Immediate Priority (0-24 hours)</h3>
+<h3>13.1 Immediate Priority (0-24 hours)</h3>
 <ul>
   ${hosts.filter(h => getHostRisk(h) >= 70).map(h => `<li>Isolate <strong>${h.name}</strong> from network and begin emergency patching (${h.vulnerabilities.length} CVEs, risk score ${getHostRisk(h)}%)</li>`).join('') || '<li>No critical hosts requiring immediate isolation</li>'}
-  ${criticalCount > 0 ? '<li>Patch all CRITICAL severity CVEs listed in Section 6</li>' : ''}
+  ${criticalCount > 0 ? '<li>Patch all CRITICAL severity CVEs listed in Section 9</li>' : ''}
   <li>Verify network segmentation between high-sensitivity and general-purpose hosts</li>
 </ul>
 
-<h3>10.2 Short-term Priority (1-7 days)</h3>
+<h3>13.2 Short-term Priority (1-7 days)</h3>
 <ul>
   <li>Patch all HIGH severity vulnerabilities</li>
-  <li>Deploy firewall rules per Section 8.1 recommendations</li>
-  <li>Harden all exposed services per Section 9 guidelines</li>
+  <li>Apply the fixes in Section 4 first, then the firewall rules in Section 11.1</li>
+  <li>Harden all exposed services per Section 12 guidelines</li>
   <li>Enable centralized logging (SIEM) and alerting for all hosts</li>
 </ul>
 
-<h3>10.3 Long-term Priority (1-4 weeks)</h3>
+<h3>13.3 Long-term Priority (1-4 weeks)</h3>
 <ul>
   <li>Implement network micro-segmentation architecture</li>
   <li>Deploy endpoint detection and response (EDR) on all hosts</li>
@@ -563,7 +540,7 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
 
 <div class="footer">
   <p><strong>CONFIDENTIAL</strong> &mdash; AI-Powered Cyber Drill System</p>
-  <p>Automated penetration test report generated using SB3 MaskablePPO reinforcement learning agents aligned with MITRE ATT&CK framework</p>
+  <p>Simulation-based security assessment &middot; Red vs Blue MaskablePPO agents &middot; MITRE ATT&CK &middot; NIST SP 800-30 likelihood scale</p>
   <p>Report Date: ${reportDate} | This document is intended for authorized personnel only.</p>
 </div>
 
@@ -648,20 +625,28 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
             <div className="text-2xl font-bold text-blue-400">{edges.length}</div>
           </div>
         </div>
-        {latestSim && (
-          <div className={`p-4 border-2 ${blueWon ? 'border-green-600 bg-green-900/20' : 'border-red-600 bg-red-900/20'}`}>
+        {assessment?.result && (
+          <p className="text-green-100 text-sm mb-3" style={font}>{assessmentSummaryLine(assessment.result)}</p>
+        )}
+        {latestSim?.outcome && (
+          <div className={`p-4 border-2 ${defended ? 'border-green-600 bg-green-900/20' : 'border-red-600 bg-red-900/20'}`}>
             <div className="flex items-center gap-2 mb-2">
-              {blueWon ? <FaCheckCircle className="text-green-400 text-lg" /> : <FaTimesCircle className="text-red-400 text-lg" />}
-              <span className={`font-bold text-lg ${blueWon ? 'text-green-200' : 'text-red-200'}`} style={font}>
-                {blueWon ? 'Defense Successful' : 'Network Breached'}
+              {defended ? <FaCheckCircle className="text-green-400 text-lg" /> : <FaTimesCircle className="text-red-400 text-lg" />}
+              <span className={`font-bold text-lg ${defended ? 'text-green-200' : 'text-red-200'}`} style={font}>
+                {defended ? 'DEFENDED' : 'BREACHED'}
               </span>
+              {outcomeReason && <span className="text-green-200/70 text-sm" style={font}>· {outcomeReason}</span>}
             </div>
-            <p className="text-green-200/60 text-sm" style={font}>
-              Simulation: {simSteps.length} steps | Red Score: {totalRedReward.toFixed(1)} | Blue Score: {totalBlueReward.toFixed(1)}
+            <p className="text-gray-400 text-xs" style={font}>
+              Simulation: {simSteps.length} steps · Training reward: Red {totalRedReward.toFixed(1)}, Blue {totalBlueReward.toFixed(1)} (not a security score)
             </p>
           </div>
         )}
       </div>
+
+      <AssessmentPanel state={assessmentState} />
+      <PlaybookPanel assessment={assessment} />
+      <WhatIfPanel assessment={assessment} />
 
       {/* Host Risk Assessment */}
       <div className="bg-gray-800/30 border-2 border-green-900/40 p-6">
@@ -694,40 +679,7 @@ ${isolationRecs ? `<p>The following hosts exceed acceptable risk thresholds and 
         </div>
       </div>
 
-      {/* CVE Inventory */}
-      <div className="bg-gray-800/30 border-2 border-green-900/40 p-6">
-        <h2 className="text-xl font-bold text-green-100 mb-4 flex items-center gap-2" style={font}>
-          <FaBug className="text-red-400" /> Vulnerability Inventory
-        </h2>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-green-900/30">
-                <th className="text-left p-3 text-green-300/80" style={font}>CVE ID</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>Name</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>Severity</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>Host</th>
-                <th className="text-left p-3 text-green-300/80" style={font}>Remediation</th>
-              </tr>
-            </thead>
-            <tbody>
-              {allCVEs.map((c, i) => {
-                const sev = c.severity || 'HIGH'
-                const sc = SEVERITY_COLORS[sev] || SEVERITY_COLORS.HIGH
-                return (
-                  <tr key={i} className="border-b border-green-900/20">
-                    <td className="p-3 text-blue-400 font-mono font-bold">{c.id}</td>
-                    <td className="p-3 text-green-100" style={font}>{c.name || 'Unknown'}</td>
-                    <td className="p-3"><span className={`px-2 py-1 text-xs font-bold ${sc.badge}`}>{sev}</span></td>
-                    <td className="p-3 text-green-200/70" style={font}>{c.host}</td>
-                    <td className="p-3 text-green-200/60 text-xs" style={font}>{c.fix || c.desc || 'Apply vendor patch'}</td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      {/* The full CVE inventory is in the PDF report (Vulnerability Findings, Patching Priority) */}
 
       {/* Firewall & Isolation Recommendations */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">

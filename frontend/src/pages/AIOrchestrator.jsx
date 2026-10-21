@@ -492,12 +492,13 @@ const AIOrchestrator = () => {
         const ra = res.step?.red_action?.action  || 'idle'
         const ba = res.step?.blue_action?.action || 'idle'
         const fwBlocked = res.step?.red_action?.reason === 'firewall_blocked'
+        const isAttack = ['exploit', 'escalate', 'lateral_move', 'exfiltrate'].includes(ra)
+        const hit = isAttack && !!res.step?.red_action?.success
         const outcome = fwBlocked ? 'Firewall Block'
-                       : res.step?.blue_reward > 0 ? 'Defended'
-                       : res.step?.red_reward  > 0 ? 'Breached' : 'Neutral'
+                       : hit ? 'Attack succeeded'
+                       : isAttack ? 'Attack failed' : ra === 'scan' ? 'Recon' : 'No attack'
         addLog(
-          fwBlocked ? 'success' : res.step?.blue_reward > 0 ? 'success'
-            : res.step?.red_reward > 0 ? 'warning' : 'info',
+          fwBlocked ? 'success' : hit ? 'warning' : isAttack ? 'success' : 'info',
           `Step ${i + 1}: Red=${ra.replace('_',' ')} → Blue=${ba.replace('_',' ')} [${outcome}]`, 'Sim'
         )
         if (res.steps_remaining <= 0) break
@@ -548,11 +549,12 @@ const AIOrchestrator = () => {
     if (full) {
       const totalRed  = full.total_red_reward?.toFixed(2)  ?? '0'
       const totalBlue = full.total_blue_reward?.toFixed(2) ?? '0'
-      const winner = parseFloat(totalRed) > parseFloat(totalBlue) ? 'Red (Attacker)' : 'Blue (Defender)'
-      addPipeLog(`Drill complete — Red: ${totalRed} | Blue: ${totalBlue} | Winner: ${winner}`, 'success')
+      const outcome = full.outcome ? full.outcome.toUpperCase() : 'N/A'
+      const reason = full.reason || ''
+      addPipeLog(`Drill complete — ${outcome}${reason ? ` (${reason})` : ''}`, 'success')
       addPipeLog('Pipeline complete! View Analytics or download the Security Report.', 'success')
-      addLog('success', `Drill complete — winner: ${winner}`, 'Sim')
-      setPipeline(p => p ? { ...p, stage: 'done', simId: full.id, totalRed, totalBlue, winner, totalSteps: full.total_steps } : p)
+      addLog('success', `Drill complete — ${outcome}`, 'Sim')
+      setPipeline(p => p ? { ...p, stage: 'done', simId: full.id, totalRed, totalBlue, outcome, reason, totalSteps: full.total_steps } : p)
     } else {
       setPipeline(p => p ? { ...p, stage: 'done' } : p)
     }
@@ -1060,13 +1062,15 @@ const AIOrchestrator = () => {
                       const counter = COUNTER_MAP[ra]
                       const isMatch = counter === ba
                       const fwBlocked = s.red_action?.reason === 'firewall_blocked'
-                      const blueWon = (s.blue_reward || 0) > 0
-                      const redWon  = (s.red_reward  || 0) > 0
+                      // label the step by what Red's action actually did, not by reward
+                      const isAttack = ['exploit', 'escalate', 'lateral_move', 'exfiltrate'].includes(ra)
+                      const hit    = isAttack && !!s.red_action?.success
+                      const missed = isAttack && !s.red_action?.success
                       return (
                         <div key={s.step_number} className={`p-2 border text-xs ${
                           fwBlocked ? 'border-cyan-700/50 bg-cyan-950/20' :
-                          blueWon   ? 'border-blue-900/40 bg-blue-950/10' :
-                          redWon    ? 'border-red-900/40 bg-red-950/10'   :
+                          missed    ? 'border-blue-900/40 bg-blue-950/10' :
+                          hit       ? 'border-red-900/40 bg-red-950/10'   :
                                       'border-green-900/20 bg-gray-900/20'
                         }`}>
                           <div className="flex items-center gap-2 mb-1 flex-wrap">
@@ -1074,9 +1078,9 @@ const AIOrchestrator = () => {
                             {isMatch && <span className="px-1.5 py-0.5 bg-green-900/30 border border-green-700/40 text-green-400 text-[10px]" style={font}>✓ Counter Match</span>}
                             {fwBlocked && <span className="px-1.5 py-0.5 bg-cyan-900/30 border border-cyan-700/40 text-cyan-300 text-[10px]" style={font}>🛡 Firewall Blocked</span>}
                             <span className={`ml-auto text-[10px] font-bold ${
-                              fwBlocked ? 'text-cyan-300' : blueWon ? 'text-blue-400' : redWon ? 'text-red-400' : 'text-green-200/40'
+                              fwBlocked ? 'text-cyan-300' : missed ? 'text-blue-400' : hit ? 'text-red-400' : 'text-green-200/40'
                             }`} style={font}>
-                              {fwBlocked ? 'Firewall Block' : blueWon ? 'Defended' : redWon ? 'Breached' : 'Neutral'}
+                              {fwBlocked ? 'Firewall Block' : hit ? 'Attack succeeded' : missed ? 'Attack failed' : ra === 'scan' ? 'Recon' : 'No attack'}
                             </span>
                           </div>
                           <div className="grid grid-cols-2 gap-2">
@@ -1084,7 +1088,7 @@ const AIOrchestrator = () => {
                               <FaSkull className="text-red-400 text-[10px] flex-shrink-0" />
                               <span className="text-red-300 capitalize" style={font}>{ra.replace('_',' ')}</span>
                               {s.red_action?.target && <span className="text-red-200/30 text-[10px]">→ {s.red_action.target}</span>}
-                              <span className={`ml-auto text-[10px] font-mono ${s.red_reward > 0 ? 'text-red-400' : 'text-green-200/30'}`}>
+                              <span title="training reward" className="ml-auto text-[10px] font-mono text-gray-500">
                                 {s.red_reward > 0 ? `+${s.red_reward?.toFixed(1)}` : s.red_reward?.toFixed(1)}
                               </span>
                             </div>
@@ -1092,7 +1096,7 @@ const AIOrchestrator = () => {
                               <FaShieldAlt className="text-blue-400 text-[10px] flex-shrink-0" />
                               <span className="text-blue-300 capitalize" style={font}>{ba.replace('_',' ')}</span>
                               {s.blue_action?.target && <span className="text-blue-200/30 text-[10px]">→ {s.blue_action.target}</span>}
-                              <span className={`ml-auto text-[10px] font-mono ${s.blue_reward > 0 ? 'text-blue-400' : 'text-green-200/30'}`}>
+                              <span title="training reward" className="ml-auto text-[10px] font-mono text-gray-500">
                                 {s.blue_reward > 0 ? `+${s.blue_reward?.toFixed(1)}` : s.blue_reward?.toFixed(1)}
                               </span>
                             </div>
@@ -1173,17 +1177,19 @@ const AIOrchestrator = () => {
                   <h3 className="text-green-100 font-bold" style={font}>Drill Complete!</h3>
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                  {[
-                    { label: 'Steps',      val: pipeline.totalSteps, color: 'text-green-100', border: 'border-green-900/30' },
-                    { label: 'Red Reward', val: pipeline.totalRed,   color: 'text-red-400',   border: 'border-red-900/30'   },
-                    { label: 'Blue Reward',val: pipeline.totalBlue,  color: 'text-blue-400',  border: 'border-blue-900/30'  },
-                    { label: 'Winner',     val: pipeline.winner,     color: 'text-green-100', border: 'border-green-900/30' },
-                  ].map((c, i) => (
-                    <div key={i} className={`bg-gray-900/30 p-3 border ${c.border}`}>
-                      <p className="text-xs text-green-200/50" style={font}>{c.label}</p>
-                      <p className={`text-lg font-bold ${c.color}`} style={font}>{c.val}</p>
-                    </div>
-                  ))}
+                  <div className={`col-span-2 bg-gray-900/30 p-3 border ${pipeline.outcome === 'BREACHED' ? 'border-red-700/60' : 'border-green-600/60'}`}>
+                    <p className="text-xs text-green-200/50" style={font}>Outcome</p>
+                    <p className={`text-xl font-bold ${pipeline.outcome === 'BREACHED' ? 'text-red-400' : 'text-green-400'}`} style={font}>{pipeline.outcome}</p>
+                    {pipeline.reason && <p className="text-xs text-green-200/70 mt-1" style={font}>{pipeline.reason}</p>}
+                  </div>
+                  <div className="bg-gray-900/30 p-3 border border-green-900/30">
+                    <p className="text-xs text-green-200/50" style={font}>Steps</p>
+                    <p className="text-lg font-bold text-green-100" style={font}>{pipeline.totalSteps}</p>
+                  </div>
+                  <div className="bg-gray-900/20 p-3 border border-gray-700/50" title="Used to train the agents, not a security score">
+                    <p className="text-xs text-gray-400" style={font}>Training reward</p>
+                    <p className="text-sm text-gray-300" style={font}>Red {pipeline.totalRed} · Blue {pipeline.totalBlue}</p>
+                  </div>
                 </div>
                 <div className="flex gap-3">
                   <button onClick={() => nav('/analytics')}

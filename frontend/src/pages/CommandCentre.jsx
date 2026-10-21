@@ -129,8 +129,8 @@ const CommandCentre = () => {
           addOutput(cmd, `Starting simulation on scenario ${scenarioId} with ${steps} steps...`)
           try {
             const result = await api.runSimulation(scenarioId, steps)
-            const winner = result.total_red_reward > result.total_blue_reward ? 'RED' : 'BLUE'
-            output = `✓ Simulation completed\n  Steps: ${result.total_steps}\n  Red Total Reward: ${result.total_red_reward?.toFixed(2)}\n  Blue Total Reward: ${result.total_blue_reward?.toFixed(2)}\n  Winner: ${winner}\n  Session: ${result.session_id}`
+            const outcome = result.outcome ? result.outcome.toUpperCase() : 'N/A'
+            output = `✓ Simulation completed\n  Outcome: ${outcome}${result.reason ? ` (${result.reason})` : ''}\n  Steps: ${result.total_steps}\n  Training reward: Red ${result.total_red_reward?.toFixed(1)} · Blue ${result.total_blue_reward?.toFixed(1)}\n  Session: ${result.session_id}`
             // Refresh user-scoped stats
             api.listMySimulations().then(setUserSims).catch(() => {})
           } catch (err) {

@@ -202,7 +202,7 @@ const Analytics = () => {
   const blueActBar = Object.entries(blueActionCounts).map(([name, value]) => ({ name, value }))
 
   // defense stats (used only for top overview cards)
-  const winRate = defenseData?.win_rate || 0
+  const breachRate = defenseData?.breach_rate || 0
   const totalSims = defenseData?.total_simulations || sims.length
 
   if (loading) {
@@ -260,7 +260,7 @@ const Analytics = () => {
           { label: 'Network Hosts', val: hostNames.length, icon: FaServer, color: 'text-green-400', desc: 'Hosts in your topology' },
           { label: 'Total CVEs', val: allCVEs.length, icon: FaExclamationTriangle, color: 'text-red-400', desc: 'Known vulnerabilities found' },
           { label: 'Simulations Run', val: totalSims, icon: FaNetworkWired, color: 'text-blue-400', desc: 'Red vs Blue drills completed' },
-          { label: 'Blue Win Rate', val: `${winRate}%`, icon: FaShieldAlt, color: 'text-green-400', desc: 'Defense success rate' },
+          { label: 'Breach Rate', val: `${breachRate}%`, icon: FaShieldAlt, color: 'text-red-400', desc: 'Drills where the network was breached' },
         ].map((c, i) => {
           const Icon = c.icon
           return (
@@ -374,18 +374,21 @@ const Analytics = () => {
               <FaCrosshairs className="inline mr-2 text-red-400" />Latest Simulation Results — Drill #{Math.max(1, sims.length - sims.findIndex(s => s.id === selectedSim.id))}
             </h2>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
-              <div className="bg-gray-900/30 p-3 border border-green-900/30"><p className="text-xs text-green-200/50" style={font}>Steps</p><p className="text-2xl font-bold text-green-100" style={font}>{selectedSim.total_steps}</p></div>
-              <div className="bg-gray-900/30 p-3 border border-red-900/30"><p className="text-xs text-red-200/50" style={font}>Red Reward</p><p className="text-2xl font-bold text-red-400" style={font}>{selectedSim.total_red_reward?.toFixed(2)}</p></div>
-              <div className="bg-gray-900/30 p-3 border border-blue-900/30"><p className="text-xs text-blue-200/50" style={font}>Blue Reward</p><p className="text-2xl font-bold text-blue-400" style={font}>{selectedSim.total_blue_reward?.toFixed(2)}</p></div>
-              <div className={`bg-gray-900/30 p-3 border ${selectedSim.total_blue_reward >= selectedSim.total_red_reward ? 'border-blue-700/50' : 'border-red-700/50'}`}>
-                <p className="text-xs text-green-200/50" style={font}>Winner</p>
-                <p className={`text-2xl font-bold ${selectedSim.total_blue_reward >= selectedSim.total_red_reward ? 'text-blue-400' : 'text-red-400'}`} style={font}>
-                  {selectedSim.total_blue_reward >= selectedSim.total_red_reward ? 'BLUE' : 'RED'}
+              <div className={`col-span-2 bg-gray-900/30 p-3 border ${selectedSim.outcome === 'breached' ? 'border-red-700/50' : 'border-green-600/50'}`}>
+                <p className="text-xs text-green-200/50" style={font}>Outcome</p>
+                <p className={`text-2xl font-bold ${selectedSim.outcome === 'breached' ? 'text-red-400' : 'text-green-400'}`} style={font}>
+                  {selectedSim.outcome ? selectedSim.outcome.toUpperCase() : 'N/A'}
                 </p>
+                {selectedSim.reason && <p className="text-xs text-green-200/70 mt-1" style={font}>{selectedSim.reason}</p>}
+              </div>
+              <div className="bg-gray-900/30 p-3 border border-green-900/30"><p className="text-xs text-green-200/50" style={font}>Steps</p><p className="text-2xl font-bold text-green-100" style={font}>{selectedSim.total_steps}</p></div>
+              <div className="bg-gray-900/20 p-3 border border-gray-700/50" title="Used to train the agents, not a security score">
+                <p className="text-xs text-gray-400" style={font}>Training reward</p>
+                <p className="text-sm text-gray-300" style={font}>Red {selectedSim.total_red_reward?.toFixed(1)} · Blue {selectedSim.total_blue_reward?.toFixed(1)}</p>
               </div>
             </div>
 
-            {/* Cumulative Reward Chart */}
+            {/* Cumulative training reward chart */}
             <ResponsiveContainer width="100%" height={350}>
               <AreaChart data={rewardTimeline}>
                 <defs>
@@ -394,7 +397,7 @@ const Analytics = () => {
                 </defs>
                 <CartesianGrid strokeDasharray="3 3" stroke="#1a3a1a" />
                 <XAxis dataKey="step" stroke="#4ade80" tick={{ fontSize: 11 }} label={{ value: 'Step', position: 'insideBottom', offset: -5, fill: '#4ade80' }} />
-                <YAxis stroke="#4ade80" tick={{ fontSize: 11 }} label={{ value: 'Cumulative Reward', angle: -90, position: 'insideLeft', fill: '#4ade80' }} />
+                <YAxis stroke="#4ade80" tick={{ fontSize: 11 }} label={{ value: 'Training reward', angle: -90, position: 'insideLeft', fill: '#4ade80' }} />
                 <Tooltip contentStyle={{ backgroundColor: '#1a1a2e', border: '1px solid #166534', color: '#4ade80' }} />
                 <Legend />
                 <Area type="monotone" dataKey="redCum" stroke="#ef4444" strokeWidth={2} fillOpacity={1} fill="url(#gRed)" name="Red (Attacker)" />
