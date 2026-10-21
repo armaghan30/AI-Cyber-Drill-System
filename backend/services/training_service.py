@@ -16,6 +16,21 @@ _pause_events: dict[int, threading.Event] = {}
 _stop_events:  dict[int, threading.Event] = {}
 
 
+def _mask_fn(env):
+    # same masking as orchestrator/train_maskable_ppo_red.py
+    return env.action_masks()
+
+
+def _make_env(Env, topo_path, max_steps, is_maskable):
+    """Build the training env. MaskablePPO gets an ActionMasker that uses the env's real masks."""
+    from stable_baselines3.common.monitor import Monitor
+    base_env = Env(topo_path, max_steps=max_steps)
+    if is_maskable:
+        from sb3_contrib.common.wrappers import ActionMasker
+        return Monitor(ActionMasker(base_env, _mask_fn))
+    return Monitor(base_env)
+
+
 def _train_worker(run_id, topo_path, role, algo, timesteps, max_steps):
     """Background thread that runs the actual RL training."""
     db = SessionLocal()
@@ -53,7 +68,6 @@ def _train_worker(run_id, topo_path, role, algo, timesteps, max_steps):
         else:
             from orchestrator.rl_env_blue import BlueRLEnvironment as Env
 
-        from stable_baselines3.common.monitor import Monitor
         from stable_baselines3.common.callbacks import BaseCallback
 
         pause_ev = _pause_events.get(run_id)
@@ -94,19 +108,7 @@ def _train_worker(run_id, topo_path, role, algo, timesteps, max_steps):
                                 pass
                 return True
 
-        # MaskablePPO requires ActionMasker wrapper; use all-valid masks (no effective masking)
-        base_env = Env(topo_path, max_steps=max_steps)
-        if is_maskable:
-            try:
-                from sb3_contrib.common.wrappers import ActionMasker
-                import numpy as _np
-                def _all_valid(e):
-                    return _np.ones(e.action_space.n, dtype=bool)
-                env = Monitor(ActionMasker(base_env, _all_valid))
-            except Exception:
-                env = Monitor(base_env)
-        else:
-            env = Monitor(base_env)
+        env = _make_env(Env, topo_path, max_steps, is_maskable)
 
         # hyperparams
         if algo == "dqn":

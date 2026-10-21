@@ -1,4 +1,5 @@
 import os
+import secrets
 import uuid
 import logging
 import threading
@@ -56,6 +57,14 @@ def _warmup_model(model, model_type):
 
 
 def _load_sb3_models(topo_path):
+    models = _load_trained(topo_path)
+    # loading a model resets the random seed, so reseed after loading
+    from orchestrator.assessment import seed_everything
+    seed_everything(secrets.randbits(32))
+    return models
+
+
+def _load_trained(topo_path):
     tag = _topo_tag(topo_path)
 
     # MaskablePPO first (best for large topologies)
@@ -110,76 +119,25 @@ def _load_sb3_models(topo_path):
 
 
 def _get_action_masks(orch, hosts, agent):
-    """Compute action masks for MaskablePPO inference. Mirrors the masks used in
-    rl_env_red.py / rl_env_blue.py so inference matches training."""
-    n = len(hosts)
-    # Red has 5 actions per host + idle; Blue has 6 (incl. deploy_firewall) + idle
-    action_dim = (5 * n + 1) if agent == "red" else (6 * n + 1)
-    mask = np.ones(action_dim, dtype=bool)
-    acc_map = {"none": 0, "user": 1, "root": 2}
-
-    for i, hname in enumerate(hosts):
-        host = orch.environment.hosts[hname]
-        if agent == "red":
-            comp = host.is_compromised
-            acc  = acc_map.get(host.access_level, 0)
-            iso  = host.is_isolated
-            if comp or iso:
-                mask[n + i] = False          # exploit
-            if not comp or acc >= 2:
-                mask[2 * n + i] = False      # escalate
-            if comp:
-                mask[3 * n + i] = False      # lateral_move
-            if not comp:
-                mask[4 * n + i] = False      # exfiltrate
-        else:  # blue
-            iso = host.is_isolated
-            if iso:
-                mask[n + i] = False          # isolate (already isolated)
-            if not iso:
-                mask[2 * n + i] = False      # restore (only valid if isolated)
-            # deploy_firewall: skip if already deployed
-            if getattr(host, "firewall_active", False):
-                mask[5 * n + i] = False
-
-    return mask
+    """Same masks as in training."""
+    from orchestrator.action_masks import red_action_mask, blue_action_mask
+    if agent == "red":
+        return red_action_mask(orch.environment, hosts, orch.red_agent)
+    return blue_action_mask(orch.environment, hosts)
 
 
 # --- action decoding (maps model output index to actual action) ---
 
 def _decode_red(idx, hosts, red_agent):
-    n = len(hosts)
-    # 5 action types: scan, exploit, escalate, lateral_move, exfiltrate
-    # each applied to n hosts, plus 1 idle action
-    if idx < n:
-        return red_agent.scan(hosts[idx])
-    elif idx < 2 * n:
-        return red_agent.exploit(hosts[idx - n])
-    elif idx < 3 * n:
-        return red_agent.escalate_privileges(hosts[idx - 2 * n])
-    elif idx < 4 * n:
-        return red_agent.lateral_move(hosts[idx - 3 * n])
-    elif idx < 5 * n:
-        return red_agent.exfiltrate(hosts[idx - 4 * n])
-    return {"action": "idle", "target": None}
+    # same decoding as RedRLEnvironment (5 action types per host + idle)
+    from orchestrator.adversarial import decode_red_action
+    return decode_red_action(red_agent, hosts, idx)
 
 
 def _decode_blue(idx, hosts, blue_agent):
-    """Mirrors BlueRLEnvironment._decode_blue_action — 6 actions per host + idle."""
-    n = len(hosts)
-    if idx < n:
-        return {"action": "patch", "target": hosts[idx]}
-    elif idx < 2 * n:
-        return {"action": "isolate", "target": hosts[idx - n]}
-    elif idx < 3 * n:
-        return {"action": "restore", "target": hosts[idx - 2 * n]}
-    elif idx < 4 * n:
-        return blue_agent.make_detect_action(hosts[idx - 3 * n])
-    elif idx < 5 * n:
-        return {"action": "harden", "target": hosts[idx - 4 * n]}
-    elif idx < 6 * n:
-        return {"action": "deploy_firewall", "target": hosts[idx - 5 * n]}
-    return {"action": "idle", "target": None}
+    # same decoding as BlueRLEnvironment (6 action types per host + idle)
+    from orchestrator.adversarial import decode_blue_action
+    return decode_blue_action(blue_agent, hosts, idx)
 
 
 _RED_TYPES_PER_HOST  = 5   # scan, exploit, escalate, lateral_move, exfiltrate
@@ -539,153 +497,6 @@ def stop_simulation(db: Session, session_id: str, user_id=None):
 
     db.refresh(sim)
     return sim
-
-
-
-# Security posture comparison: trained Red vs (random Blue | trained Blue)
-# Used to quantify how much the trained Blue agent actually improves
-# network defense. Nothing is persisted to DB — just aggregate stats.
-
-
-def _one_step_random_blue(orch, red_model, m_type, host_order):
-    from orchestrator.state_vectors import flatten_red_state
-
-    n = len(host_order)
-    blue_action_dim = 6 * n + 1   # blue has 6 actions per host + idle (incl. deploy_firewall)
-
-    red_state = orch._build_red_state()
-    blue_state = orch._build_blue_state()
-    red_obs = flatten_red_state(red_state, host_order)
-
-    # Red uses trained model (stochastic for varied behaviour)
-    if m_type == "maskable_ppo":
-        red_masks = _get_action_masks(orch, host_order, "red")
-        red_idx, _ = red_model.predict(red_obs, deterministic=False, action_masks=red_masks)
-    else:
-        red_idx, _ = red_model.predict(red_obs, deterministic=False)
-
-    # Blue picks a random valid action
-    if m_type == "maskable_ppo":
-        blue_masks = _get_action_masks(orch, host_order, "blue")
-        valid = np.where(blue_masks)[0]
-        blue_idx = int(np.random.choice(valid)) if len(valid) > 0 else blue_action_dim - 1
-    else:
-        blue_idx = int(np.random.randint(0, blue_action_dim))
-
-    red_act = _decode_red(int(red_idx), host_order, orch.red_agent)
-    blue_act = _decode_blue(blue_idx, host_order, orch.blue_agent)
-
-    prev = orch.logs[-1]["environment"] if orch.logs else orch._snapshot_environment()
-    env_state = orch.environment.step(red_act, blue_act)
-    r_reward, b_reward = orch.reward_engine.compute_rewards(prev, env_state, red_act, blue_act)
-
-    orch.logs.append({
-        "step": len(orch.logs) + 1,
-        "timestamp": _dt.datetime.now().isoformat(),
-        "red_state": red_state, "blue_state": blue_state,
-        "red_action": red_act, "blue_action": blue_act,
-        "red_reward": r_reward, "blue_reward": b_reward,
-        "environment": env_state,
-    })
-    return r_reward, b_reward
-
-
-def _run_in_memory(topo, red_m, blue_m, m_type, max_steps, random_blue):
-    orch = _init_orchestrator(topo)
-    host_order = list(orch.environment.hosts.keys())
-    total_r = 0.0
-    total_b = 0.0
-
-    for _ in range(max_steps):
-        if random_blue:
-            rr, br = _one_step_random_blue(orch, red_m, m_type, host_order)
-        else:
-            entry = _sb3_step(orch, red_m, blue_m, host_order, m_type)
-            rr, br = entry["red_reward"], entry["blue_reward"]
-        total_r += rr
-        total_b += br
-
-    # collect final host state for breach determination
-    final_hosts = {
-        name: {
-            "is_compromised": host.is_compromised,
-            "data_exfiltrated": host.data_exfiltrated,
-        }
-        for name, host in orch.environment.hosts.items()
-    }
-    return total_r, total_b, final_hosts
-
-
-def _is_breach(final_hosts):
-    n = len(final_hosts)
-    exfiltrated = any(h["data_exfiltrated"] for h in final_hosts.values())
-    compromised = sum(1 for h in final_hosts.values() if h["is_compromised"])
-    return exfiltrated or (compromised / n > 0.2 if n > 0 else False)
-
-
-def run_posture_comparison(db: Session, scenario_id: int, trials: int = 20, max_steps: int = 15):
-    scenario = db.query(Scenario).filter(Scenario.id == scenario_id).first()
-    if not scenario:
-        raise ValueError(f"Scenario {scenario_id} not found")
-
-    topo = _topo_path(scenario)
-    red_m, blue_m, m_type = _load_sb3_models(topo)
-    if red_m is None or blue_m is None:
-        raise ValueError("No trained models available for this topology — train models first")
-
-    # Baseline: trained Red attacks, random Blue tries to defend
-    base_breaches = 0
-    base_r_rewards = []
-    base_b_rewards = []
-    for _ in range(trials):
-        rr, br, final_hosts = _run_in_memory(topo, red_m, blue_m, m_type, max_steps, random_blue=True)
-        if _is_breach(final_hosts):
-            base_breaches += 1
-        base_r_rewards.append(rr)
-        base_b_rewards.append(br)
-
-    # AI defense: trained Red vs trained Blue
-    ai_breaches = 0
-    ai_r_rewards = []
-    ai_b_rewards = []
-    for _ in range(trials):
-        rr, br, final_hosts = _run_in_memory(topo, red_m, blue_m, m_type, max_steps, random_blue=False)
-        if _is_breach(final_hosts):
-            ai_breaches += 1
-        ai_r_rewards.append(rr)
-        ai_b_rewards.append(br)
-
-    base_rate = (base_breaches / trials) * 100
-    ai_rate = (ai_breaches / trials) * 100
-
-    def _mean(arr):
-        return round(sum(arr) / len(arr), 2) if arr else 0
-
-    return {
-        "scenario_id": scenario_id,
-        "scenario_name": scenario.name,
-        "trials_per_mode": trials,
-        "max_steps": max_steps,
-        "model_type": m_type,
-        "breach_criterion": "exfiltration occurred OR >20% hosts compromised",
-        "baseline": {
-            "label": "Random Blue (no AI defense)",
-            "breach_rate": round(base_rate, 1),
-            "breaches": base_breaches,
-            "defended": trials - base_breaches,
-            "mean_red_reward": _mean(base_r_rewards),
-            "mean_blue_reward": _mean(base_b_rewards),
-        },
-        "ai_defense": {
-            "label": "Trained Blue (AI defense)",
-            "breach_rate": round(ai_rate, 1),
-            "breaches": ai_breaches,
-            "defended": trials - ai_breaches,
-            "mean_red_reward": _mean(ai_r_rewards),
-            "mean_blue_reward": _mean(ai_b_rewards),
-        },
-        "improvement_pct": round(base_rate - ai_rate, 1),
-    }
 
 
 def get_attack_path(db: Session, sim_id: int):

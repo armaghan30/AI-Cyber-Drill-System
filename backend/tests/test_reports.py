@@ -24,8 +24,8 @@ def test_sim_summary(client):
     assert r.status_code == 200
     d = r.json()
     assert d["total_steps"] == 5
-    assert "winner" in d
-    assert d["winner"] in ("red", "blue")
+    assert "winner" not in d
+    assert d["outcome"] in ("breached", "defended") and d["reason"]
 
 
 def test_summary_404(client):

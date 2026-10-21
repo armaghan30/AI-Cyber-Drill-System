@@ -5,6 +5,7 @@ from sqlalchemy import func
 
 from backend.models.simulation import Simulation, SimulationStep, SimulationStatus
 from backend.models.training_run import TrainingRun, TrainingStatus
+from orchestrator.verdict import BREACH_CRITERION
 
 
 def get_sim_summary(db: Session, sim_id):
@@ -37,7 +38,9 @@ def get_sim_summary(db: Session, sim_id):
         "blue_reward_per_step": b_rewards,
         "red_action_counts": r_actions,
         "blue_action_counts": b_actions,
-        "winner": "red" if sim.total_red_reward > sim.total_blue_reward else "blue",
+        "outcome": sim.outcome,
+        "reason": sim.reason,
+        "verdict": sim.verdict,
     }
 
 
@@ -140,8 +143,6 @@ def generate_report(db: Session, sim_id):
         r_actions[ra] = r_actions.get(ra, 0) + 1
         b_actions[ba] = b_actions.get(ba, 0) + 1
 
-    winner = "red" if sim.total_red_reward > sim.total_blue_reward else "blue"
-
     return {
         "report_type": "simulation",
         "simulation_id": sim_id,
@@ -149,7 +150,9 @@ def generate_report(db: Session, sim_id):
         "total_steps": sim.total_steps,
         "total_red_reward": round(sim.total_red_reward, 2),
         "total_blue_reward": round(sim.total_blue_reward, 2),
-        "winner": winner,
+        "outcome": sim.outcome,
+        "reason": sim.reason,
+        "verdict": sim.verdict,
         "red_mean_reward": round(sum(r_rewards) / len(r_rewards), 2) if r_rewards else 0,
         "blue_mean_reward": round(sum(b_rewards) / len(b_rewards), 2) if b_rewards else 0,
         "red_max_reward": round(max(r_rewards), 2) if r_rewards else 0,
@@ -178,13 +181,16 @@ def get_defense_analysis(db: Session, user_id=None):
 
     if not sims:
         return {
-            "total_simulations": 0, "blue_wins": 0, "red_wins": 0,
-            "win_rate": 0, "avg_blue_reward": 0,
+            "total_simulations": 0, "drills_defended": 0, "drills_breached": 0,
+            "defended_rate": 0, "breach_rate": 0, "avg_blue_reward": 0,
+            "breach_criterion": BREACH_CRITERION,
             "defense_actions": {}, "recent_simulations": [],
         }
 
-    blue_wins = sum(1 for s in sims if s.total_blue_reward >= s.total_red_reward)
-    red_wins = len(sims) - blue_wins
+    # drills with no final state are skipped
+    judged = [s for s in sims if s.outcome]
+    defended = sum(1 for s in judged if s.outcome == "defended")
+    breached = len(judged) - defended
     avg_blue = sum(s.total_blue_reward for s in sims) / len(sims)
 
     all_steps = db.query(SimulationStep).filter(
@@ -200,16 +206,19 @@ def get_defense_analysis(db: Session, user_id=None):
 
     return {
         "total_simulations": len(sims),
-        "blue_wins": blue_wins,
-        "red_wins": red_wins,
-        "win_rate": round(blue_wins / len(sims) * 100, 1),
+        "drills_defended": defended,
+        "drills_breached": breached,
+        "defended_rate": round(defended / len(judged) * 100, 1) if judged else 0,
+        "breach_rate": round(breached / len(judged) * 100, 1) if judged else 0,
+        "breach_criterion": BREACH_CRITERION,
         "avg_blue_reward": round(avg_blue, 2),
         "defense_actions": def_actions,
         "recent_simulations": [{
             "id": s.id, "total_steps": s.total_steps,
             "red_reward": round(s.total_red_reward, 2),
             "blue_reward": round(s.total_blue_reward, 2),
-            "winner": "blue" if s.total_blue_reward >= s.total_red_reward else "red",
+            "outcome": s.outcome,
+            "reason": s.reason,
         } for s in recent],
     }
 
@@ -226,6 +235,7 @@ def get_firewall_analysis(db: Session, sim_id: int):
     if not steps:
         return {
             "simulation_id": sim_id,
+            "total_firewall_rules": 0,
             "firewall_rules": [],
             "lateral_moves_blocked": 0,
             "recommended_rules": [],
@@ -297,7 +307,7 @@ def get_ai_recommendations(db: Session, scenario_id: int):
     red_target_hits = {}   
     red_action_hits = {}   
     red_action_total = {}  
-    blue_action_wins = {}  
+    blue_action_uses = {}
     lateral_targets = {}  
 
     for s in all_steps:
@@ -311,11 +321,12 @@ def get_ai_recommendations(db: Session, scenario_id: int):
         red_target_hits[r_target] = red_target_hits.get(r_target, 0) + 1
         red_action_total[r_action] = red_action_total.get(r_action, 0) + 1
 
-        if (s.red_reward or 0) > 0:
+        # count what actually worked, not what earned training reward
+        if ra.get("success"):
             red_action_hits[r_action] = red_action_hits.get(r_action, 0) + 1
 
-        if (s.blue_reward or 0) > 0:
-            blue_action_wins[b_action] = blue_action_wins.get(b_action, 0) + 1
+        if b_action not in ("idle", "unknown"):
+            blue_action_uses[b_action] = blue_action_uses.get(b_action, 0) + 1
 
         if r_action == "lateral_move":
             lateral_targets[r_target] = lateral_targets.get(r_target, 0) + 1
@@ -326,7 +337,7 @@ def get_ai_recommendations(db: Session, scenario_id: int):
     # sort targets by hit count
     sorted_targets = sorted(red_target_hits.items(), key=lambda x: x[1], reverse=True)
     top_red_action = max(red_action_hits, key=red_action_hits.get) if red_action_hits else "exploit"
-    top_blue_action = max(blue_action_wins, key=blue_action_wins.get) if blue_action_wins else "patch"
+    top_blue_action = max(blue_action_uses, key=blue_action_uses.get) if blue_action_uses else "patch"
 
     # build recommendations list
     recs = []
@@ -383,16 +394,16 @@ def get_ai_recommendations(db: Session, scenario_id: int):
             ),
         })
 
-    # 3. most effective Blue defense to recommend to SOC
+    # 3. what the trained defender relied on most
     if top_blue_action and top_blue_action != "unknown":
-        wins = blue_action_wins.get(top_blue_action, 0)
+        uses = blue_action_uses.get(top_blue_action, 0)
         recs.append({
             "type": "defense_strategy",
             "priority": "INFO",
-            "title": f"AI-recommended response: prioritize '{top_blue_action.replace('_', ' ')}'",
+            "title": f"AI defender's main response: '{top_blue_action.replace('_', ' ')}'",
             "detail": (
-                f"The Blue agent's '{top_blue_action}' action earned positive reward "
-                f"{wins} times — the most effective defense across all simulations."
+                f"The trained Blue agent used '{top_blue_action}' {uses} times across these drills, "
+                "more than any other action. Run a security assessment to measure how much it helps."
             ),
             "action": (
                 f"Automate '{top_blue_action.replace('_', ' ')}' in your SOAR playbook as first response. "
@@ -400,7 +411,8 @@ def get_ai_recommendations(db: Session, scenario_id: int):
                    "isolate": "Integrate with firewall API to auto-quarantine suspicious hosts.",
                    "detect": "Feed alerts into SIEM and trigger playbook on signature match.",
                    "harden": "Apply CIS Benchmark hardening scripts on a scheduled basis.",
-                   "restore": "Maintain offline backups and test restore procedures monthly."
+                   "restore": "Maintain offline backups and test restore procedures monthly.",
+                   "deploy_firewall": "Turn on host firewalls on the most-attacked servers."
                    }.get(top_blue_action, "Document as standard operating procedure.")
             ),
         })
@@ -416,7 +428,7 @@ def get_ai_recommendations(db: Session, scenario_id: int):
             "title": f"Top threat: '{top_red_action.replace('_', ' ')}' — {hit_rate}% success rate",
             "detail": (
                 f"Red agent used '{top_red_action}' {total} time(s) with a "
-                f"{hit_rate}% success rate. This is the highest-rewarding attack technique."
+                f"{hit_rate}% success rate. This was the attacker's most successful technique."
             ),
             "action": (
                 "Deploy targeted countermeasures: "

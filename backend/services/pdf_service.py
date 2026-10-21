@@ -19,6 +19,35 @@ from backend.models.scenario import Scenario
 from backend.models.simulation import Simulation, SimulationStep
 from backend.services.report_service import get_firewall_analysis
 from backend.services.simulation_service import get_attack_path
+from backend.services.assessment_service import latest_assessment, public_result
+
+PANEL = colors.HexColor('#111827')
+GREEN_DARK = colors.HexColor('#14532d')
+GREEN = colors.HexColor('#16a34a')
+GREEN_LIGHT = colors.HexColor('#4ade80')
+GREEN_SOFT = colors.HexColor('#f0fdf4')
+LINE = colors.HexColor('#e5e7eb')
+INK = colors.HexColor('#1f2937')
+LEVEL_COLORS = {
+    'Very High': ('#b91c1c', '#fee2e2'), 'High': ('#c2410c', '#ffedd5'), 'Moderate': ('#a16207', '#fef9c3'),
+    'Low': ('#15803d', '#dcfce7'), 'Very Low': ('#15803d', '#dcfce7'),
+}
+ACTION_NAMES = {'deploy_firewall': 'Firewall', 'patch': 'Patch', 'harden': 'Harden'}
+
+
+def _table_style(extra=()):
+    return TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+        ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, -1), 8.5),
+        ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
+        ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
+        ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
+        ('TOPPADDING', (0, 0), (-1, -1), 4),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        *extra,
+    ])
 
 # small CVE db for severity lookup
 CVE_SEV = {
@@ -93,15 +122,13 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     # get firewall analysis
     fw = get_firewall_analysis(db, sim.id) if sim else None
 
-    # figure out model type from simulation or guess
     model_type = "MaskablePPO"
-    if scenario.num_hosts <= 8:
-        model_type = "PPO"
+    a = latest_assessment(db, scenario_id)
+    result = public_result(a.result) if a else None
 
-    # work out winner
-    blue_won = False
-    if sim:
-        blue_won = (sim.total_blue_reward or 0) >= (sim.total_red_reward or 0)
+    # breach-based verdict (orchestrator/verdict.py), not a reward comparison
+    verdict = sim.verdict if sim else None
+    defended = bool(verdict) and verdict["outcome"] == "defended"
 
     # ── build PDF ──
     buf = io.BytesIO()
@@ -112,28 +139,29 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     )
 
     styles = getSampleStyleSheet()
-    title_style = ParagraphStyle('title', fontSize=22, fontName='Helvetica-Bold', leading=28,
-                                  textColor=colors.HexColor('#111111'), spaceAfter=6, alignment=TA_CENTER)
+    title_style = ParagraphStyle('title', fontSize=26, fontName='Helvetica-Bold', leading=30,
+                                  textColor=GREEN_LIGHT, spaceAfter=4)
     sub_style = ParagraphStyle('sub', fontSize=11, fontName='Helvetica',
-                                textColor=colors.HexColor('#555555'), spaceAfter=4, alignment=TA_CENTER)
+                                textColor=colors.HexColor('#bbf7d0'), spaceAfter=10)
+    cover_meta = ParagraphStyle('cover_meta', fontSize=9, fontName='Helvetica', leading=15,
+                                 textColor=colors.HexColor('#d1d5db'))
     h2_style = ParagraphStyle('h2', fontSize=14, fontName='Helvetica-Bold',
-                               textColor=colors.HexColor('#111111'), spaceBefore=16, spaceAfter=6,
-                               borderPadding=(0, 0, 4, 0))
-    h3_style = ParagraphStyle('h3', fontSize=11, fontName='Helvetica-Bold',
-                               textColor=colors.HexColor('#333333'), spaceBefore=10, spaceAfter=4)
+                               textColor=GREEN_DARK, spaceBefore=16, spaceAfter=6)
+    h3_style = ParagraphStyle('h3', fontSize=10.5, fontName='Helvetica-Bold',
+                               textColor=colors.HexColor('#166534'), spaceBefore=10, spaceAfter=4)
     body_style = ParagraphStyle('body', fontSize=9, fontName='Helvetica',
-                                 textColor=colors.HexColor('#222222'), spaceAfter=4, leading=14)
+                                 textColor=INK, spaceAfter=4, leading=14)
     small_style = ParagraphStyle('small', fontSize=8, fontName='Helvetica',
-                                  textColor=colors.HexColor('#555555'), spaceAfter=2)
+                                  textColor=colors.HexColor('#6b7280'), spaceAfter=2)
     mono_style = ParagraphStyle('mono', fontSize=8, fontName='Courier',
                                  textColor=colors.HexColor('#333333'))
 
     # severity colors
     sev_colors = {
-        'CRITICAL': colors.HexColor('#c0392b'),
-        'HIGH': colors.HexColor('#e67e22'),
-        'MEDIUM': colors.HexColor('#2980b9'),
-        'LOW': colors.HexColor('#27ae60'),
+        'CRITICAL': colors.HexColor('#b91c1c'),
+        'HIGH': colors.HexColor('#c2410c'),
+        'MEDIUM': colors.HexColor('#a16207'),
+        'LOW': colors.HexColor('#15803d'),
     }
 
     def sev_para(sev):
@@ -144,42 +172,39 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     story = []
 
     # ── COVER PAGE ──
-    story.append(Spacer(1, 2*cm))
-    story.append(Paragraph("AI-POWERED CYBER DRILL", title_style))
-    story.append(Paragraph("Security Assessment Report &mdash; Red vs Blue Adversarial Reinforcement Learning", sub_style))
-    story.append(Spacer(1, 0.5*cm))
-    story.append(HRFlowable(width="100%", thickness=2, color=colors.black))
-    story.append(Spacer(1, 0.5*cm))
-
-    outcome_color = colors.HexColor('#27ae60') if blue_won else colors.HexColor('#c0392b')
-    outcome_text = 'DEFENDED' if blue_won else 'BREACHED'
-    outcome_style = ParagraphStyle('outcome', fontSize=28, fontName='Helvetica-Bold', leading=34,
-                                    textColor=outcome_color, alignment=TA_CENTER, spaceAfter=12)
-    story.append(Paragraph(f'[ {outcome_text} ]', outcome_style))
-
-    cover_data = [
-        ['Target Network:', scenario.name],
-        ['Total Hosts:', str(scenario.num_hosts)],
-        ['Network Links:', str(len(edges_data))],
-        ['Assessment Date:', today],
-        ['AI Algorithm:', model_type],
-        ['Classification:', 'CONFIDENTIAL'],
-    ]
-    cover_table = Table(cover_data, colWidths=[5*cm, 10*cm])
-    cover_table.setStyle(TableStyle([
-        ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
-        ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
-        ('FONTSIZE', (0, 0), (-1, -1), 10),
-        ('BOTTOMPADDING', (0, 0), (-1, -1), 6),
-        ('TOPPADDING', (0, 0), (-1, -1), 6),
-        ('LINEBELOW', (0, -1), (-1, -1), 0.5, colors.lightgrey),
+    outcome_text = 'DEFENDED' if defended else 'BREACHED'
+    if result:
+        cur = result['modes']['current_security']
+        headline = f"Breach likelihood: <b>{cur['nist']['level']}</b> ({cur['breach_rate']}%, NIST SP 800-30)"
+    elif verdict:
+        headline = f"Latest drill: <b>{outcome_text}</b> &mdash; {verdict['reason']}"
+    else:
+        headline = "No drill or assessment has been run yet"
+    meta = (f"<b>Target network:</b> {scenario.name}<br/>"
+            f"<b>Scope:</b> {scenario.num_hosts} hosts, {len(edges_data)} network links<br/>"
+            f"<b>Assessment date:</b> {today}<br/>"
+            f"<b>Method:</b> simulated Red vs Blue drills ({model_type}), MITRE ATT&amp;CK, NIST SP 800-30<br/>"
+            f"<b>Classification:</b> CONFIDENTIAL")
+    cover = Table([[Paragraph("CyberDrill", title_style)],
+                   [Paragraph("Security Assessment Report", sub_style)],
+                   [Paragraph(headline, ParagraphStyle('headline', parent=sub_style, fontSize=12,
+                                                       textColor=colors.white, spaceAfter=14))],
+                   [Paragraph(meta, cover_meta)]],
+                  colWidths=[17*cm])
+    cover.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, -1), PANEL),
+        ('LINEBEFORE', (0, 0), (0, -1), 5, GREEN),
+        ('LEFTPADDING', (0, 0), (-1, -1), 22),
+        ('TOPPADDING', (0, 0), (0, 0), 26),
+        ('BOTTOMPADDING', (0, -1), (-1, -1), 24),
     ]))
-    story.append(cover_table)
+    story.append(Spacer(1, 1.5*cm))
+    story.append(cover)
     story.append(PageBreak())
 
     # ── 1. EXECUTIVE SUMMARY ──
     story.append(Paragraph("1. Executive Summary", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
     story.append(Spacer(1, 0.2*cm))
 
     all_cves = []
@@ -191,21 +216,37 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     high_count = sum(1 for c in all_cves if c['severity'] == 'HIGH')
 
     story.append(Paragraph(
-        f"This report documents the automated security assessment of the <b>{scenario.name}</b> network "
-        f"({scenario.num_hosts} hosts, {len(edges_data)} connections). The AI-powered drill used adversarial "
-        f"reinforcement learning ({model_type}) — a Red agent (attacker) competing against a Blue agent (defender) "
-        f"— to discover attack paths and measure network resilience.",
+        f"This report documents a simulation-based security assessment of the <b>{scenario.name}</b> network "
+        f"({scenario.num_hosts} hosts, {len(edges_data)} connections). A digital copy of the network was attacked "
+        f"by a trained Red agent and defended by a trained Blue agent ({model_type}), without touching the real systems.",
         body_style
     ))
+    if result:
+        cur, ai = result['modes']['current_security'], result['modes']['ai_defence']
+        story.append(Paragraph(
+            f"<b>Assessed likelihood of a breach: {cur['nist']['level']} ({cur['breach_rate']}%) with current security; "
+            f"{ai['nist']['level']} ({ai['breach_rate']}%) with AI defence</b> (NIST SP 800-30 Table G-4, "
+            f"{result['drills_per_mode']} drills per mode).",
+            body_style
+        ))
 
     if sim:
         story.append(Paragraph(
             f"The simulation ran for <b>{sim.total_steps} steps</b>. "
-            f"Red agent score: <b>{sim.total_red_reward:.1f}</b> | "
-            f"Blue agent score: <b>{sim.total_blue_reward:.1f}</b>. "
-            f"Outcome: <b>{outcome_text}</b>.",
+            f"Outcome: <b>{outcome_text}</b>. "
+            f"(Training rewards, used only to train the agents: Red {sim.total_red_reward:.1f}, "
+            f"Blue {sim.total_blue_reward:.1f}.)",
             body_style
         ))
+        if verdict:
+            story.append(Paragraph(
+                f"The outcome is decided by what happened to the network, not by the training rewards: "
+                f"a drill counts as BREACHED if data was exfiltrated or more than 20% of hosts "
+                f"are compromised at the end. Final state: <b>{verdict['hosts_compromised']}/"
+                f"{verdict['hosts_total']}</b> hosts compromised, <b>{verdict['hosts_exfiltrated']}</b> "
+                f"host(s) exfiltrated.",
+                body_style
+            ))
 
     exec_data = [
         ['Metric', 'Value'],
@@ -217,15 +258,18 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
         ['Simulation Steps', str(sim.total_steps) if sim else 'N/A'],
         ['Drill Outcome', outcome_text],
     ]
+    if result:
+        exec_data.insert(1, ['Breach likelihood (current security)', f"{cur['nist']['level']} ({cur['breach_rate']}%)"])
+        exec_data.insert(2, ['Breach likelihood (with AI defence)', f"{ai['nist']['level']} ({ai['breach_rate']}%)"])
     exec_table = Table(exec_data, colWidths=[8*cm, 7*cm])
     exec_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+        ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTNAME', (0, 1), (-1, -1), 'Helvetica'),
         ('FONTSIZE', (0, 0), (-1, -1), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+        ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
     ]))
@@ -242,10 +286,14 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
             body_style
         ))
 
-    # ── 2. HOST RISK ASSESSMENT ──
+    # ── 2-4. SECURITY ASSESSMENT, PLAYBOOK, WHAT-IF ──
+    styles_ = {'h2': h2_style, 'h3': h3_style, 'body': body_style, 'small': small_style}
+    _assessment_sections(story, result, styles_)
+
+    # ── 5. HOST RISK ASSESSMENT ──
     story.append(PageBreak())
-    story.append(Paragraph("2. Host Risk Assessment", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+    story.append(Paragraph("5. Host Risk Assessment", h2_style))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
     story.append(Spacer(1, 0.2*cm))
 
     host_rows = [['Host', 'OS', 'Services', 'CVEs', 'Sensitivity', 'Risk']]
@@ -264,12 +312,12 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
     h_table = Table(host_rows, colWidths=[3.5*cm, 2.5*cm, 3.5*cm, 1.2*cm, 2*cm, 3.3*cm])
     h_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+        ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+        ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -278,8 +326,8 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
     # ── 3. CVE INVENTORY ──
     story.append(Spacer(1, 0.5*cm))
-    story.append(Paragraph("3. Vulnerability Inventory", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+    story.append(Paragraph("6. Vulnerability Inventory", h2_style))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
     story.append(Spacer(1, 0.2*cm))
 
     # sort by severity
@@ -298,12 +346,12 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
     cve_table = Table(cve_rows, colWidths=[4*cm, 2.2*cm, 3*cm, 6.8*cm])
     cve_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+        ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+        ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
         ('TOPPADDING', (0, 0), (-1, -1), 4),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -313,19 +361,19 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     # ── 4. SIMULATION RESULTS ──
     if sim and steps:
         story.append(PageBreak())
-        story.append(Paragraph("4. Simulation Results", h2_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+        story.append(Paragraph("7. Latest Drill Results", h2_style))
+        story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
         story.append(Spacer(1, 0.2*cm))
 
         story.append(Paragraph(
             f"The adversarial drill ran for <b>{sim.total_steps} steps</b> using the <b>{model_type}</b> algorithm. "
-            f"Red agent (attacker) accumulated <b>{sim.total_red_reward:.2f}</b> reward. "
-            f"Blue agent (defender) accumulated <b>{sim.total_blue_reward:.2f}</b> reward.",
+            f"Training rewards (not a security score): Red {sim.total_red_reward:.2f}, "
+            f"Blue {sim.total_blue_reward:.2f}.",
             body_style
         ))
 
         # step log (first 20 steps to keep PDF short)
-        step_rows = [['Step', 'Red Action', 'Target', 'R. Reward', 'Blue Action', 'Target', 'B. Reward']]
+        step_rows = [['Step', 'Red Action', 'Target', 'R. Train.', 'Blue Action', 'Target', 'B. Train.']]
         for s in steps[:20]:
             ra = s.red_action.get('action', 'idle') if s.red_action else 'idle'
             rt = s.red_action.get('target', '-') if s.red_action else '-'
@@ -333,22 +381,22 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
             bt = s.blue_action.get('target', '-') if s.blue_action else '-'
             step_rows.append([
                 str(s.step_number),
-                Paragraph(f'<font color="#c0392b">{ra}</font>', small_style),
+                Paragraph(f'<font color="#b91c1c">{ra}</font>', small_style),
                 Paragraph(str(rt or '-'), small_style),
                 f'{s.red_reward:.1f}',
-                Paragraph(f'<font color="#2980b9">{ba}</font>', small_style),
+                Paragraph(f'<font color="#1d4ed8">{ba}</font>', small_style),
                 Paragraph(str(bt or '-'), small_style),
                 f'{s.blue_reward:.1f}',
             ])
 
         step_table = Table(step_rows, colWidths=[1*cm, 2.5*cm, 2.8*cm, 1.8*cm, 2.5*cm, 2.8*cm, 1.8*cm])
         step_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+            ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 8),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+            ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 3),
             ('TOPPADDING', (0, 0), (-1, -1), 3),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -366,8 +414,8 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
             ap = None
         if ap and ap.get('entry_point'):
             story.append(PageBreak())
-            story.append(Paragraph("5. Red Agent Attack Path", h2_style))
-            story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+            story.append(Paragraph("8. Red Agent Attack Path", h2_style))
+            story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
             story.append(Spacer(1, 0.2*cm))
             story.append(Paragraph(
                 "This section reconstructs the exact route the Red (attacker) agent took through the network: "
@@ -395,8 +443,8 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
                 ('FONTNAME', (0, 0), (0, -1), 'Helvetica-Bold'),
                 ('FONTNAME', (1, 0), (1, -1), 'Helvetica'),
                 ('FONTSIZE', (0, 0), (-1, -1), 9),
-                ('BACKGROUND', (0, 0), (0, -1), colors.HexColor('#fbe9e7')),
-                ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                ('BACKGROUND', (0, 0), (0, -1), GREEN_SOFT),
+                ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
                 ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
                 ('TOPPADDING', (0, 0), (-1, -1), 5),
             ]))
@@ -416,12 +464,12 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
                     ])
                 chain_table = Table(chain_rows, colWidths=[1.5*cm, 5*cm, 8.5*cm])
                 chain_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#fef6f5'), colors.white]),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+                    ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
                     ('TOPPADDING', (0, 0), (-1, -1), 4),
                     ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -442,12 +490,12 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
                     ])
                 lat_table = Table(lat_rows, colWidths=[1.5*cm, 6.5*cm, 7*cm])
                 lat_table.setStyle(TableStyle([
-                    ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-                    ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+                    ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+                    ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
                     ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
                     ('FONTSIZE', (0, 0), (-1, -1), 9),
-                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-                    ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+                    ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+                    ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
                     ('BOTTOMPADDING', (0, 0), (-1, -1), 4),
                     ('TOPPADDING', (0, 0), (-1, -1), 4),
                 ]))
@@ -460,15 +508,15 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
                 story.append(Paragraph("Exfiltrated Hosts (Data Loss)", h3_style))
                 for host in exfil:
                     story.append(Paragraph(
-                        f"&bull; <b><font color='#c0392b'>{host}</font></b> &mdash; sensitive data was successfully exfiltrated by the Red agent.",
+                        f"&bull; <b><font color='#b91c1c'>{host}</font></b> &mdash; sensitive data was successfully exfiltrated by the Red agent.",
                         body_style
                     ))
 
     # ── 6. FIREWALL ANALYSIS ──
     if fw and fw['recommended_rules']:
         story.append(PageBreak())
-        story.append(Paragraph("6. Simulated Firewall Engine — Recommended Rules", h2_style))
-        story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+        story.append(Paragraph("9. Simulated Firewall Engine — Recommended Rules", h2_style))
+        story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
         story.append(Spacer(1, 0.2*cm))
         story.append(Paragraph(fw.get('summary', ''), body_style))
         story.append(Spacer(1, 0.2*cm))
@@ -483,12 +531,12 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
         fw_table = Table(fw_rows, colWidths=[1*cm, 10*cm, 5*cm])
         fw_table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-            ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+            ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+            ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
             ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
             ('FONTSIZE', (0, 0), (-1, -1), 9),
-            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#eaf4fb'), colors.white]),
-            ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+            ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+            ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
             ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
             ('TOPPADDING', (0, 0), (-1, -1), 5),
         ]))
@@ -496,8 +544,8 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
     # ── 7. MITRE + RECOMMENDATIONS ──
     story.append(PageBreak())
-    story.append(Paragraph("7. MITRE ATT&amp;CK Mapping &amp; Recommendations", h2_style))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.black))
+    story.append(Paragraph("10. MITRE ATT&amp;CK Mapping &amp; Recommendations", h2_style))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
     story.append(Spacer(1, 0.2*cm))
 
     mitre_rows = [['Red Action', 'MITRE Tactic', 'Blue Counter', 'Recommended Fix']]
@@ -510,20 +558,20 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     ]
     for red, tactic, blue, fix in mitre_data:
         mitre_rows.append([
-            Paragraph(f'<font color="#c0392b"><b>{red}</b></font>', body_style),
+            Paragraph(f'<font color="#b91c1c"><b>{red}</b></font>', body_style),
             Paragraph(tactic, small_style),
-            Paragraph(f'<font color="#2980b9"><b>{blue}</b></font>', body_style),
+            Paragraph(f'<font color="#1d4ed8"><b>{blue}</b></font>', body_style),
             Paragraph(fix, small_style),
         ])
 
     m_table = Table(mitre_rows, colWidths=[2.5*cm, 4*cm, 2.5*cm, 7*cm])
     m_table.setStyle(TableStyle([
-        ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor('#1a1a1a')),
-        ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
+        ('BACKGROUND', (0, 0), (-1, 0), GREEN_SOFT),
+        ('TEXTCOLOR', (0, 0), (-1, 0), GREEN_DARK), ('LINEBELOW', (0, 0), (-1, 0), 1.2, GREEN),
         ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
         ('FONTSIZE', (0, 0), (-1, 0), 9),
-        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9f9f9'), colors.white]),
-        ('GRID', (0, 0), (-1, -1), 0.5, colors.HexColor('#cccccc')),
+        ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.HexColor('#f9fafb'), colors.white]),
+        ('LINEBELOW', (0, 1), (-1, -1), 0.4, LINE),
         ('BOTTOMPADDING', (0, 0), (-1, -1), 5),
         ('TOPPADDING', (0, 0), (-1, -1), 5),
         ('VALIGN', (0, 0), (-1, -1), 'TOP'),
@@ -542,11 +590,11 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
     else:
         story.append(Paragraph("&bull; No hosts require emergency isolation", body_style))
     if crit_count:
-        story.append(Paragraph(f"&bull; Patch all {crit_count} CRITICAL CVEs listed in Section 3", body_style))
+        story.append(Paragraph(f"&bull; Patch all {crit_count} CRITICAL CVEs listed in Section 6", body_style))
 
     story.append(Paragraph("<b>Short-term (1-7 days):</b>", body_style))
     story.append(Paragraph("&bull; Patch all HIGH severity vulnerabilities", body_style))
-    story.append(Paragraph("&bull; Apply AI-recommended firewall rules from Section 5", body_style))
+    story.append(Paragraph("&bull; Apply the what-if fixes from Section 4, then the firewall rules in Section 9", body_style))
     story.append(Paragraph("&bull; Harden exposed services (SSH, RDP, SMB, HTTP)", body_style))
 
     story.append(Paragraph("<b>Long-term (1-4 weeks):</b>", body_style))
@@ -556,16 +604,154 @@ def generate_pdf(db: Session, scenario_id: int, sim_id: int = None):
 
     # footer note
     story.append(Spacer(1, 0.5*cm))
-    story.append(HRFlowable(width="100%", thickness=1, color=colors.lightgrey))
+    story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
     story.append(Paragraph(
-        f"CONFIDENTIAL — AI-Powered Cyber Drill System | "
+        f"CONFIDENTIAL — CyberDrill | "
         f"Generated: {today} | "
         f"Algorithm: {model_type} | "
         f"For authorized personnel only.",
         ParagraphStyle('footer', fontSize=7, fontName='Helvetica',
-                        textColor=colors.grey, alignment=TA_CENTER, spaceBefore=4)
+                        textColor=colors.HexColor('#6b7280'), alignment=TA_CENTER, spaceBefore=4)
     ))
 
     doc.build(story)
     buf.seek(0)
     return buf
+
+
+def _level(level):
+    fg, bg = LEVEL_COLORS.get(level, LEVEL_COLORS['Moderate'])
+    return f'<font color="{fg}"><b>{level}</b></font>'
+
+
+def _mode_cell(title, m, st):
+    return [Paragraph(f'<font color="#6b7280" size="7.5">{title.upper()}</font>', st['small']),
+            Paragraph(f'<font size="13">{_level(m["nist"]["level"])}</font>', st['body']),
+            Paragraph(f'Breach rate <b>{m["breach_rate"]}%</b> (95% range {m["ci95"]["low"]}&ndash;{m["ci95"]["high"]}%)', st['body']),
+            Paragraph(f'{m["breaches"]}/{m["drills"]} drills breached &middot; avg {m["mean_hosts_compromised"]} hosts compromised, '
+                      f'data stolen from {m["mean_hosts_exfiltrated"]} hosts on average', st['small'])]
+
+
+def _two_cards(left, right):
+    t = Table([[left, right]], colWidths=[8.4*cm, 8.4*cm])
+    t.setStyle(TableStyle([
+        ('BOX', (0, 0), (0, 0), 0.6, LINE), ('BOX', (1, 0), (1, 0), 0.6, LINE),
+        ('LINEABOVE', (0, 0), (-1, 0), 2.5, GREEN),
+        ('VALIGN', (0, 0), (-1, -1), 'TOP'),
+        ('LEFTPADDING', (0, 0), (-1, -1), 8), ('TOPPADDING', (0, 0), (-1, -1), 6),
+    ]))
+    return t
+
+
+def _note(text, st, color=GREEN, bg=GREEN_SOFT):
+    t = Table([[Paragraph(text, st['body'])]], colWidths=[17*cm])
+    t.setStyle(TableStyle([('BACKGROUND', (0, 0), (-1, -1), bg), ('LINEBEFORE', (0, 0), (0, -1), 3, color),
+                           ('LEFTPADDING', (0, 0), (-1, -1), 8)]))
+    return t
+
+
+def _assessment_sections(story, result, st):
+    h2, h3, body, small = st['h2'], st['h3'], st['body'], st['small']
+
+    def heading(text):
+        story.append(PageBreak())
+        story.append(Paragraph(text, h2))
+        story.append(HRFlowable(width="100%", thickness=1.2, color=GREEN))
+        story.append(Spacer(1, 0.2*cm))
+
+    if not result:
+        heading("2. Security Assessment")
+        story.append(Paragraph("No security assessment has been run for this network yet. Run one from the Security "
+                               "Report page; sections 2-4 (assessment, AI defence playbook and what-if hardening) "
+                               "will then appear here.", body))
+        return
+
+    cur, ai, n = result['modes']['current_security'], result['modes']['ai_defence'], result['drills_per_mode']
+    heading("2. Security Assessment")
+    story.append(Paragraph(
+        f"The trained attacker ran <b>{n} drills of {result['steps']} steps</b> against a digital copy of the network, "
+        f"first with no active defence and then with the trained AI defender. A drill counts as breached when "
+        f"{result['breach_criterion']}. The breach rate is rated on the likelihood scale of <b>{result['citation']}</b>.", body))
+    story.append(_two_cards(_mode_cell('Current security (no active defence)', cur, st),
+                            _mode_cell('With AI defence', ai, st)))
+    if 'breach_rate_reduction' in result:
+        story.append(Spacer(1, 0.2*cm))
+        story.append(Paragraph(f"The AI defender lowered the breach rate by <b>{result['breach_rate_reduction']} percentage points</b>.", body))
+
+    scale = [['Likelihood level', 'Breach rate', 'Meaning (NIST SP 800-30)']]
+    for level, rng, meaning in (('Very High', '96-100%', 'almost certain to have adverse impacts'),
+                                ('High', '80-95%', 'highly likely to have adverse impacts'),
+                                ('Moderate', '21-79%', 'somewhat likely to have adverse impacts'),
+                                ('Low', '5-20%', 'unlikely to have adverse impacts'),
+                                ('Very Low', '0-4%', 'highly unlikely to have adverse impacts')):
+        scale.append([Paragraph(_level(level), body), rng, meaning])
+    t = Table(scale, colWidths=[3.5*cm, 3*cm, 10.5*cm])
+    t.setStyle(_table_style())
+    story.append(Spacer(1, 0.2*cm))
+    story.append(t)
+
+    story.append(Paragraph("2.1 Most attacked hosts (no active defence)", h3))
+    rows = [['Host', 'Compromised', 'Data stolen']] + [
+        [h['host'], f"{h['compromised_drills']}/{n} drills", f"{h['exfiltrated_drills']}/{n} drills"] for h in cur['top_hosts']]
+    t = Table(rows, colWidths=[5*cm, 6*cm, 6*cm])
+    t.setStyle(_table_style())
+    story.append(t)
+    story.append(Paragraph("2.2 CVEs the attacker used", h3))
+    rows = [['CVE', 'Host', 'Used in']] + [
+        [Paragraph(f'<font name="Courier">{c["cve"]}</font>', body), ', '.join(c['hosts']), f"{c['drills']}/{n} drills"]
+        for c in cur['top_cves']]
+    t = Table(rows, colWidths=[5*cm, 6*cm, 6*cm])
+    t.setStyle(_table_style())
+    story.append(t)
+
+    pb = result.get('playbook')
+    heading("3. AI Defence Playbook")
+    if pb:
+        m = pb['drills']
+        story.append(Paragraph(f"What the trained defender did across {m} drills, and how much it changed the outcome "
+                               "compared with no active defence.", body))
+        story.append(Paragraph("3.1 Do first", h3))
+        for k, i in enumerate(pb['immediate'], 1):
+            story.append(Paragraph(f"{k}. {i['advice']} <font color='#6b7280'>({i['drills']}/{m} drills, usually step {i['typical_step']})</font>", body))
+        story.append(Paragraph("3.2 Hardening priorities", h3))
+        rows = [['Host', 'Action', 'Drills', 'Compromised\n(before > after)', 'Data stolen\n(before > after)']]
+        for h in pb['hardening']:
+            acts = ', '.join(ACTION_NAMES.get(x, x) for x in h['actions'])
+            if h.get('compromised_before', 0) == 0 and h.get('stolen_before', 0) == 0:
+                rows.append([h['host'], acts, f"{h['drills']}/{m}", Paragraph('<font color="#6b7280">not attacked (no measured effect)</font>', small), ''])
+            else:
+                rows.append([h['host'], acts, f"{h['drills']}/{m}",
+                             f"{h.get('compromised_before', '-')} > {h['compromised_after']}",
+                             f"{h.get('stolen_before', '-')} > {h['stolen_after']}"])
+        t = Table(rows, colWidths=[2.6*cm, 3.4*cm, 2*cm, 4.5*cm, 4.5*cm])
+        t.setStyle(_table_style())
+        story.append(t)
+        story.append(Paragraph("3.3 Incident response", h3))
+        story.append(Paragraph(pb['incident_response']['note'], body))
+        if pb['gaps']:
+            story.append(Paragraph("3.4 Remaining gaps (still breached with AI defence)", h3))
+            rows = [['Host', 'Compromised', 'Data stolen', 'Recommended fix']] + [
+                [g['host'], f"{g['compromised']}/{m}", f"{g['stolen']}/{m}", Paragraph(g['advice'], small)] for g in pb['gaps']]
+            t = Table(rows, colWidths=[2.6*cm, 2.8*cm, 2.8*cm, 8.8*cm])
+            t.setStyle(_table_style())
+            story.append(t)
+
+    wi = result.get('what_if')
+    heading("4. What-if Hardening")
+    if wi:
+        story.append(Paragraph(f"The top {len(wi['fixes'])} fixes below were applied to a copy of the network, which was "
+                               "then attacked again with no active defence.", body))
+        rows = [['#', 'Fix', 'Why']] + [
+            [str(k), Paragraph(f"<b>{f['advice']}</b>", small), Paragraph(f['reason'], small)] for k, f in enumerate(wi['fixes'], 1)]
+        t = Table(rows, colWidths=[0.8*cm, 7.6*cm, 8.6*cm])
+        t.setStyle(_table_style())
+        story.append(t)
+        story.append(Spacer(1, 0.2*cm))
+        if wi.get('after'):
+            story.append(_two_cards(_mode_cell('Before (current security)', wi['before'], st),
+                                    _mode_cell('After the fixes', wi['after'], st)))
+            story.append(Spacer(1, 0.2*cm))
+        if wi.get('remaining_entry_points'):
+            story.append(_note(wi['entry_points_note'], st, colors.HexColor('#d97706'), colors.HexColor('#fffbeb')))
+            story.append(Spacer(1, 0.15*cm))
+        story.append(_note(wi['caveat'], st))

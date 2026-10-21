@@ -32,6 +32,10 @@ class SimulationResponse(BaseModel):
     total_steps: int
     total_red_reward: float
     total_blue_reward: float
+    # breach-based verdict; None while the drill has no final state
+    outcome: Optional[str] = None      # "breached" | "defended"
+    reason: Optional[str] = None       # e.g. "data stolen from H9 · 3/50 hosts compromised (over 20%)"
+    verdict: Optional[Dict[str, Any]] = None
     created_at: datetime
     completed_at: Optional[datetime] = None
 

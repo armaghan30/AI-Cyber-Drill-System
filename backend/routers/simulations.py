@@ -84,17 +84,3 @@ def stop(session_id: str, db: Session = Depends(get_db),
         return simulation_service.stop_simulation(db, session_id, user_id=user.id)
     except ValueError as e:
         raise HTTPException(400, str(e))
-
-
-@router.post("/posture-comparison")
-def posture_comparison(
-    scenario_id: int,
-    trials: int = Query(10, ge=1, le=50),
-    max_steps: int = Query(15, ge=5, le=50),
-    db: Session = Depends(get_db),
-    user: User = Depends(get_current_user),
-):
-    try:
-        return simulation_service.run_posture_comparison(db, scenario_id, trials, max_steps)
-    except ValueError as e:
-        raise HTTPException(400, str(e))

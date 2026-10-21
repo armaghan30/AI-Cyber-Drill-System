@@ -30,6 +30,22 @@ class Simulation(Base):
     steps = relationship("SimulationStep", back_populates="simulation",
                          order_by="SimulationStep.step_number")
 
+    # Breach-based verdict (orchestrator/verdict.py), not a reward comparison
+    @property
+    def verdict(self):
+        from orchestrator.verdict import simulation_outcome
+        return simulation_outcome(self.final_state)
+
+    @property
+    def outcome(self):
+        v = self.verdict
+        return v["outcome"] if v else None
+
+    @property
+    def reason(self):
+        v = self.verdict
+        return v["reason"] if v else None
+
 
 class SimulationStep(Base):
     __tablename__ = "simulation_steps"
