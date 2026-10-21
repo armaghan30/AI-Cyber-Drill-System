@@ -1,0 +1,185 @@
+network:
+  hosts:
+    fw_edge_01:
+      os: linux
+      services:
+      - ssh
+      - dns
+      - http
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2020-1350
+      - CVE-2021-25215
+      - CVE-2023-44487
+      sensitivity: medium
+      exposed: true
+    web_app_01:
+      os: linux
+      services:
+      - ssh
+      - http
+      - https
+      - http-proxy
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2023-44487
+      - CVE-2021-41773
+      - CVE-2019-0211
+      sensitivity: medium
+      exposed: true
+    mail_01:
+      os: linux
+      services:
+      - ssh
+      - smtp
+      - imap
+      - https
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2020-28188
+      - CVE-2021-44228
+      - CVE-2021-38371
+      sensitivity: medium
+      exposed: true
+    app_srv_01:
+      os: linux
+      services:
+      - ssh
+      - http
+      - docker
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2023-44487
+      - CVE-2021-41773
+      - CVE-2019-0211
+      sensitivity: medium
+      exposed: true
+    app_win_01:
+      os: windows
+      services:
+      - http
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2023-44487
+      - CVE-2021-41773
+      - CVE-2019-0211
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: medium
+      exposed: true
+    dc_01:
+      os: windows
+      services:
+      - dns
+      - kerberos-sec
+      - ldap
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2020-1350
+      - CVE-2021-25215
+      - CVE-2021-44228
+      - CVE-2020-1472
+      - CVE-2017-0144
+      sensitivity: high
+      exposed: false
+    file_srv_01:
+      os: windows
+      services:
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: medium
+      exposed: false
+    db_primary_01:
+      os: linux
+      services:
+      - ssh
+      - mysql
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2023-21912
+      - CVE-2022-21270
+      - CVE-2020-14812
+      sensitivity: high
+      exposed: false
+    db_backup_01:
+      os: linux
+      services:
+      - ssh
+      - postgresql
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2022-1552
+      - CVE-2021-20229
+      sensitivity: high
+      exposed: false
+    ws_hr_01:
+      os: windows
+      services:
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: medium
+      exposed: false
+    ws_finance_01:
+      os: windows
+      services:
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: medium
+      exposed: false
+    ws_dev_01:
+      os: windows
+      services:
+      - ssh
+      - microsoft-ds
+      - ms-wbt-server
+      vulnerabilities:
+      - CVE-2023-38408
+      - CVE-2021-28041
+      - CVE-2017-0144
+      - CVE-2020-0796
+      sensitivity: medium
+      exposed: false
+  edges:
+  - - dc_01
+    - db_primary_01
+  - - db_primary_01
+    - db_backup_01
+  - - db_backup_01
+    - dc_01
+  - - fw_edge_01
+    - web_app_01
+  - - web_app_01
+    - mail_01
+  - - mail_01
+    - app_srv_01
+  - - app_srv_01
+    - app_win_01
+  - - app_win_01
+    - file_srv_01
+  - - file_srv_01
+    - ws_hr_01
+  - - ws_hr_01
+    - ws_finance_01
+  - - ws_finance_01
+    - ws_dev_01
+  - - ws_dev_01
+    - fw_edge_01
+  - - dc_01
+    - fw_edge_01
