@@ -37,12 +37,16 @@ def main():
     topology_path = sys.argv[1] if len(sys.argv) > 1 else "orchestrator/baselines/demo_corporate_network.yaml"
     total_timesteps = int(sys.argv[2]) if len(sys.argv) > 2 else 50_000
     max_steps = int(sys.argv[3]) if len(sys.argv) > 3 else 20
+    # optional: trained Red model to train against (default: rule-based Red)
+    red_model_path = sys.argv[4] if len(sys.argv) > 4 else None
     topo = _topo_tag(topology_path)
 
     os.makedirs("results/models", exist_ok=True)
     os.makedirs("results/csv", exist_ok=True)
 
-    base_env = BlueRLEnvironment(topology_path, max_steps=max_steps)
+    base_env = BlueRLEnvironment(topology_path, max_steps=max_steps, red_model=red_model_path)
+    if red_model_path:
+        print(f"[MaskablePPO BLUE] Opponent: trained Red model {red_model_path}")
     env = Monitor(ActionMasker(base_env, mask_fn))
 
     model = MaskablePPO(

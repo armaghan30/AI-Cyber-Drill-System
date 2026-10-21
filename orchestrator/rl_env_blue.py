@@ -7,19 +7,24 @@ import gymnasium as gym
 from gymnasium import spaces
 
 from orchestrator.orchestrator_core import Orchestrator
-from orchestrator.state_vectors import flatten_blue_state
-from orchestrator.reward_engine import RewardEngine
+from orchestrator.state_vectors import flatten_blue_state, flatten_red_state
+from orchestrator.reward_engine import RewardEngine, blue_outcome_reward
+from orchestrator.action_masks import blue_action_mask, red_action_mask
+from orchestrator.adversarial import decode_red_action, decode_blue_action, make_pool, act
 
 
 class BlueRLEnvironment(gym.Env):
 
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, topology_path: str, max_steps: int = 20, seed: int | None = None):
+    def __init__(self, topology_path: str, max_steps: int = 20, seed: int | None = None,
+                 red_model=None):
         super().__init__()
         self.topology_path = topology_path
         self.max_steps = max_steps
         self.current_step = 0
+        # trained Red opponent(s); None means the rule-based RedAgent
+        self.red_pool = make_pool(red_model)
 
         self._build_orchestrator()
 
@@ -56,31 +61,9 @@ class BlueRLEnvironment(gym.Env):
 
     # ------------------------------------------------------------
     def _decode_blue_action(self, index: int) -> Dict[str, Any]:
-        n = len(self.host_order)
-
         if index < 0 or index >= self.action_dim:
             raise ValueError(f"Invalid BLUE action index: {index}")
-
-        if index < n:
-            host = self.host_order[index]
-            return {"action": "patch", "target": host}
-        elif index < 2 * n:
-            host = self.host_order[index - n]
-            return {"action": "isolate", "target": host}
-        elif index < 3 * n:
-            host = self.host_order[index - 2 * n]
-            return {"action": "restore", "target": host}
-        elif index < 4 * n:
-            host = self.host_order[index - 3 * n]
-            return self.blue_agent.make_detect_action(host)
-        elif index < 5 * n:
-            host = self.host_order[index - 4 * n]
-            return {"action": "harden", "target": host}
-        elif index < 6 * n:
-            host = self.host_order[index - 5 * n]
-            return {"action": "deploy_firewall", "target": host}
-        else:
-            return {"action": "idle", "target": None}
+        return decode_blue_action(self.blue_agent, self.host_order, index)
 
     # ------------------------------------------------------------
     def reset(self, seed: int | None = None, options: Dict | None = None):
@@ -89,6 +72,8 @@ class BlueRLEnvironment(gym.Env):
 
         self.current_step = 0
         self._build_orchestrator()
+        if self.red_pool is not None:
+            self.red_pool.sample()  # one opponent per episode
 
         blue_state = self.orch.get_blue_state()
         self.host_order = list(self.environment.hosts.keys())
@@ -102,7 +87,7 @@ class BlueRLEnvironment(gym.Env):
 
         blue_action = self._decode_blue_action(int(action_index))
 
-        red_action = self.red_agent.choose_action()
+        red_action = self._red_turn()
 
         prev_state = self.orch._snapshot_environment()
         env_state = self.environment.step(red_action, blue_action)
@@ -124,29 +109,25 @@ class BlueRLEnvironment(gym.Env):
             "environment": env_state,
         }
 
+        if terminated:
+            # end-of-episode reward from the drill verdict: +50 DEFENDED, -50 BREACHED
+            outcome = blue_outcome_reward(env_state["hosts"])
+            blue_reward += outcome
+            info["outcome_reward"] = outcome
+
         return np.array(obs_vec, dtype=np.float32), float(blue_reward), terminated, truncated, info
 
     # ------------------------------------------------------------
+    def _red_turn(self) -> Dict[str, Any]:
+        if self.red_pool is None:
+            return self.red_agent.choose_action()
+        obs = flatten_red_state(self.orch.get_red_state(), self.host_order)
+        mask = red_action_mask(self.environment, self.host_order, self.red_agent)
+        return decode_red_action(self.red_agent, self.host_order, act(self.red_pool.current, obs, mask))
+
+    # ------------------------------------------------------------
     def action_masks(self) -> np.ndarray:
-        n = len(self.host_order)
-        mask = np.ones(self.action_dim, dtype=bool)
-
-        for i, hname in enumerate(self.host_order):
-            host = self.environment.hosts[hname]
-            iso = host.is_isolated
-
-            # isolate: skip if already isolated
-            if iso:
-                mask[n + i] = False
-            # restore: only if isolated
-            if not iso:
-                mask[2 * n + i] = False
-            # deploy_firewall: skip if already active
-            if getattr(host, "firewall_active", False):
-                mask[5 * n + i] = False
-
-        # idle is always valid (last slot)
-        return mask
+        return blue_action_mask(self.environment, self.host_order)
 
     # ------------------------------------------------------------
     def render(self):

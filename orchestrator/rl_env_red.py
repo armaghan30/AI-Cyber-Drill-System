@@ -7,19 +7,24 @@ import gymnasium as gym
 from gymnasium import spaces
 
 from orchestrator.orchestrator_core import Orchestrator
-from orchestrator.state_vectors import flatten_red_state
+from orchestrator.state_vectors import flatten_red_state, flatten_blue_state
 from orchestrator.reward_engine import RewardEngine
+from orchestrator.action_masks import red_action_mask, blue_action_mask
+from orchestrator.adversarial import decode_red_action, decode_blue_action, make_pool, act  # noqa: F401
 
 
 class RedRLEnvironment(gym.Env):
 
     metadata = {"render_modes": ["human"]}
 
-    def __init__(self, topology_path: str, max_steps: int = 20, seed: int | None = None):
+    def __init__(self, topology_path: str, max_steps: int = 20, seed: int | None = None,
+                 blue_model=None):
         super().__init__()
         self.topology_path = topology_path
         self.max_steps = max_steps
         self.current_step = 0
+        # trained Blue opponent(s); None means the rule-based BlueAgent
+        self.blue_pool = make_pool(blue_model)
 
         self._build_orchestrator()
 
@@ -55,28 +60,9 @@ class RedRLEnvironment(gym.Env):
 
     # ------------------------------------------------------------------------------
     def _decode_red_action(self, index: int) -> Dict[str, Any]:
-        n = len(self.host_order)
-
         if index < 0 or index >= self.action_dim:
             raise ValueError(f"Invalid RED action index: {index}")
-
-        if index < n:
-            host = self.host_order[index]
-            return self.red_agent.scan(host)
-        elif index < 2 * n:
-            host = self.host_order[index - n]
-            return self.red_agent.exploit(host)
-        elif index < 3 * n:
-            host = self.host_order[index - 2 * n]
-            return self.red_agent.escalate_privileges(host)
-        elif index < 4 * n:
-            host = self.host_order[index - 3 * n]
-            return self.red_agent.lateral_move(host)
-        elif index < 5 * n:
-            host = self.host_order[index - 4 * n]
-            return self.red_agent.exfiltrate(host)
-        else:
-            return {"action": "idle", "target": None}
+        return decode_red_action(self.red_agent, self.host_order, index)
 
     # ------------------------------------------------------------
     def reset(self, seed: int | None = None, options: Dict | None = None):
@@ -88,6 +74,8 @@ class RedRLEnvironment(gym.Env):
 
         self.current_step = 0
         self._build_orchestrator()
+        if self.blue_pool is not None:
+            self.blue_pool.sample()  # one opponent per episode
 
         red_state = self.orch.get_red_state()
         self.host_order = list(self.environment.hosts.keys())
@@ -103,10 +91,18 @@ class RedRLEnvironment(gym.Env):
         
         self.current_step += 1
 
+        # a learned Blue observes the same moment Red does (as in the drill), then both act
+        if self.blue_pool is not None:
+            blue_obs = flatten_blue_state(self.orch.get_blue_state(), self.host_order)
+            blue_idx = act(self.blue_pool.current, blue_obs,
+                           blue_action_mask(self.environment, self.host_order))
+
         red_action = self._decode_red_action(int(action_index))
 
-       
-        blue_action = self.blue_agent.choose_action(red_action)
+        if self.blue_pool is None:
+            blue_action = self.blue_agent.choose_action(red_action)
+        else:
+            blue_action = decode_blue_action(self.blue_agent, self.host_order, blue_idx)
 
         prev_state = self.orch._snapshot_environment()
 
@@ -135,31 +131,7 @@ class RedRLEnvironment(gym.Env):
 
     # ------------------------------------------------------------
     def action_masks(self) -> np.ndarray:
-        n = len(self.host_order)
-        mask = np.ones(self.action_dim, dtype=bool)
-        acc_map = {"none": 0, "user": 1, "root": 2}
-
-        for i, hname in enumerate(self.host_order):
-            host = self.environment.hosts[hname]
-            comp = host.is_compromised
-            acc  = acc_map.get(host.access_level, 0)
-            iso  = host.is_isolated
-
-            # exploit: skip if already compromised or host is isolated
-            if comp or iso:
-                mask[n + i] = False
-            # escalate: only if compromised and not yet root
-            if not comp or acc >= 2:
-                mask[2 * n + i] = False
-            # lateral_move: only toward hosts not yet compromised
-            if comp:
-                mask[3 * n + i] = False
-            # exfiltrate: only from compromised hosts
-            if not comp:
-                mask[4 * n + i] = False
-
-        # idle is always valid (last slot)
-        return mask
+        return red_action_mask(self.environment, self.host_order, self.red_agent)
 
     # ------------------------------------------------------------
     def render(self):
