@@ -7,7 +7,7 @@ from sqlalchemy import inspect, text
 
 from backend.config import settings
 from backend.database import engine, Base, SessionLocal
-from backend.routers import health, scenarios, simulations, training, reports, auth, topology_upload, cve
+from backend.routers import health, scenarios, simulations, training, reports, auth, topology_upload, cve, assessments
 
 
 def _ensure_columns():
@@ -77,6 +77,19 @@ def _cleanup_stale_sessions():
         db.close()
 
 
+def _cleanup_stale_assessments():
+    from backend.services.assessment_service import mark_interrupted
+    db = SessionLocal()
+    try:
+        n = mark_interrupted(db)
+        if n:
+            print(f"[startup] marked {n} unfinished assessment(s) as FAILED")
+    except Exception as e:
+        print(f"[startup] assessment cleanup failed: {e}")
+    finally:
+        db.close()
+
+
 def _remove_demo_scenarios():
     """Delete any auto-seeded demo scenarios. The platform is meant for real
     IT managers who upload their own network topology — leaving a built-in
@@ -104,6 +117,7 @@ async def lifespan(app: FastAPI):
     settings.USER_UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
     _checkpoint_wal()          # clear accumulated WAL pages before any simulation
     _cleanup_stale_sessions()
+    _cleanup_stale_assessments()
     _remove_demo_scenarios()
     yield
 
@@ -136,3 +150,4 @@ app.include_router(training.router, prefix=settings.API_V1_PREFIX)
 app.include_router(reports.router, prefix=settings.API_V1_PREFIX)
 app.include_router(topology_upload.router, prefix=settings.API_V1_PREFIX)
 app.include_router(cve.router, prefix=settings.API_V1_PREFIX)
+app.include_router(assessments.router, prefix=settings.API_V1_PREFIX)
